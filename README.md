@@ -10,9 +10,10 @@ the library FFTW3: http://www.fftw.org
 
 Supported devices:
 1. SdrPlay (need to install API/HW driver – V2.*(but not V3.*) from https://www.sdrplay.com) 
-2. AirSpy (need to install libusb-1.0 from https://libusb.info)
-3. PlutoSDR (Only Linux and firmware 0.31. The program makes a temporary kernel patch for plutosdr-fw 0.31)
+2. AirSpy
+3. PlutoSDR
 
+For windows and PlutoSDR(windows) need libusb-1.0 branch: https://github.com/Novakov/libusb/tree/winusb-lazy-create-file
 
 Received DVB-T2 signal parameters:
 1. SISO and one RT-TX
@@ -25,9 +26,7 @@ Not supported:
 Tested configurations:
 OS: Linux Mint 20 Ulyana 64-bit. Windows 10 22H2
 Processor: Intel© Core™ i5-8600 CPU @ 3.10GHz × 6
-
 To view the video signal, a VLC player v2.x (not v.3x) with udp://@:7654 parameters was used (URL)
-
 
 
 If you find this project useful, consider donating:
