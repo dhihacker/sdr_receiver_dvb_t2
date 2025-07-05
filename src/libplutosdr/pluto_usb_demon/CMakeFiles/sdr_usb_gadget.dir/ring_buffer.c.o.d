@@ -1,0 +1,25 @@
+CMakeFiles/sdr_usb_gadget.dir/ring_buffer.c.o: \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/ring_buffer.c \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/stdc-predef.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/ring_buffer.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/opt/ext-toolchain/lib/gcc/arm-linux-gnueabihf/7.3.1/include/stdbool.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/opt/ext-toolchain/lib/gcc/arm-linux-gnueabihf/7.3.1/include/stdint.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/stdint.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/libc-header-start.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/features.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/sys/cdefs.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/wordsize.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/long-double.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/gnu/stubs.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/gnu/stubs-hard.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/types.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/typesizes.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/wchar.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/string.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/opt/ext-toolchain/lib/gcc/arm-linux-gnueabihf/7.3.1/include/stddef.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/xlocale.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/string.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/string2.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/stdlib.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/string3.h \
+ /home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/output/host/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/strings_fortified.h

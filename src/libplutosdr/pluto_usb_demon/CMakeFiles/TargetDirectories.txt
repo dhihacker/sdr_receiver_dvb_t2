@@ -1,0 +1,7 @@
+/home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/CMakeFiles/sdr_usb_gadget.dir
+/home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/CMakeFiles/edit_cache.dir
+/home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/CMakeFiles/rebuild_cache.dir
+/home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/CMakeFiles/list_install_components.dir
+/home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/CMakeFiles/install.dir
+/home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/CMakeFiles/install/local.dir
+/home/radio/QtProjects/tools_/PlutoSDR/project_038/buildroot_038/pluto_usb_demon/CMakeFiles/install/strip.dir
