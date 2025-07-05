@@ -27,7 +27,7 @@ class time_deinterleaver : public QObject
 {
     Q_OBJECT
 public:
-    explicit time_deinterleaver(QWaitCondition* _signal_in, QMutex* _mutex, QObject *parent = nullptr);
+    explicit time_deinterleaver(QMutex* _mutex, QObject *parent = nullptr);
     ~time_deinterleaver();
 
     void start(dvbt2_parameters _dvbt2, l1_presignalling _l1_pre, l1_postsignalling _l1_post);
@@ -46,9 +46,7 @@ public slots:
     void stop();
 
 private:
-    QWaitCondition* signal_in;
     QThread* thread;
-    QWaitCondition* signal_out;
     QMutex* mutex_in;
     QMutex* mutex_out;
 

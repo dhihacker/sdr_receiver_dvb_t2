@@ -17,14 +17,12 @@
 #include <immintrin.h>
 
 //-------------------------------------------------------------------------------------------
-time_deinterleaver::time_deinterleaver(QWaitCondition* _signal_in, QMutex *_mutex, QObject *parent) :
+time_deinterleaver::time_deinterleaver(QMutex *_mutex, QObject *parent) :
     QObject(parent),
-    signal_in(_signal_in),
     mutex_in(_mutex)
 {
     mutex_out = new QMutex;
-    signal_out = new QWaitCondition;
-    qam = new llr_demapper(signal_out, mutex_out);
+    qam = new llr_demapper(mutex_out);
     thread = new QThread;
     qam->moveToThread(thread);
     connect(this, &time_deinterleaver::ti_block, qam, &llr_demapper::execute);
@@ -33,6 +31,33 @@ time_deinterleaver::time_deinterleaver(QWaitCondition* _signal_in, QMutex *_mute
     connect(qam, &llr_demapper::finished, thread, &QThread::quit, Qt::DirectConnection);
     connect(thread, &QThread::finished, thread, &QThread::deleteLater);
     thread->start();
+}
+//-------------------------------------------------------------------------------------------
+time_deinterleaver::~time_deinterleaver()
+{
+    emit stop_qam();
+    if(thread->isRunning()) thread->wait(1000);
+    if(flag_start){
+        delete [] fec_len_bits;
+        delete [] bits_per_cell;
+        delete [] n_ti;
+        delete [] p_i;
+        for (int i = 0; i < num_plp; ++i) delete[] fec_blocks_per_time_interleving[i];
+        delete [] fec_blocks_per_time_interleving;
+        delete [] frame_interval;
+        delete [] first_frame_idx;
+        delete [] cells_per_fec_block;
+        delete [] slice_end;
+        delete [] num_rows;
+        for (int i = 0; i < num_plp; ++i) delete[] num_cols[i];
+        delete [] num_cols;
+        for (int i = 0; i < num_plp; ++i) delete [] permutations[i];
+        delete [] permutations;
+        delete [] last_frame_idx;
+        _mm_free(buffer_a);
+        _mm_free(buffer_b);
+        delete [] show_data;
+    }
 }
 //-------------------------------------------------------------------------------------------
 void time_deinterleaver::start(dvbt2_parameters _dvbt2, l1_presignalling _l1_pre, l1_postsignalling _l1_post)
@@ -142,33 +167,6 @@ void time_deinterleaver::start(dvbt2_parameters _dvbt2, l1_presignalling _l1_pre
 
     show_data = new complex[len_max];
     flag_start = true;
-}
-//-------------------------------------------------------------------------------------------
-time_deinterleaver::~time_deinterleaver()
-{
-    emit stop_qam();
-    if(thread->isRunning()) thread->wait(1000);
-    if(flag_start){
-        delete [] fec_len_bits;
-        delete [] bits_per_cell;
-        delete [] n_ti;
-        delete [] p_i;
-        for (int i = 0; i < num_plp; ++i) delete[] fec_blocks_per_time_interleving[i];
-        delete [] fec_blocks_per_time_interleving;
-        delete [] frame_interval;
-        delete [] first_frame_idx;
-        delete [] cells_per_fec_block;
-        delete [] slice_end;
-        delete [] num_rows;
-        for (int i = 0; i < num_plp; ++i) delete[] num_cols[i];
-        delete [] num_cols;
-        for (int i = 0; i < num_plp; ++i) delete [] permutations[i];
-        delete [] permutations;
-        delete [] last_frame_idx;
-        _mm_free(buffer_a);
-        _mm_free(buffer_b);
-        delete [] show_data;
-    }
 }
 //-------------------------------------------------------------------------------------------
 void time_deinterleaver::address_cell_deinterleaving(int _num_fec_block_max, int _cells_per_fec_block,
@@ -288,10 +286,6 @@ void time_deinterleaver::l1_dyn_execute(l1_postsignalling _l1_post, int _len_in,
 void time_deinterleaver::execute(int _len_in, complex* _ofdm_cell)
 {
     mutex_in->lock();
-    signal_in->wakeOne();
-
-//            mutex_in->unlock();
-//            return;
 
     int num_cells = _len_in;
     complex* ofdm_cell = &_ofdm_cell[0];
@@ -337,12 +331,17 @@ void time_deinterleaver::execute(int _len_in, complex* _ofdm_cell)
                 if(idx_show_plp == plp_id) {
                     int len = cells_per_fec_block_plp;
                     memcpy(show_data, &time_deint_cell[0], sizeof(complex) * static_cast<unsigned long>(len));
+
                     emit replace_constelation(len, show_data);
+
                 }
+
                 mutex_out->lock();
+
                 emit ti_block(ti_block_size, time_deint_cell, plp_id, l1_post);
-                signal_out->wait(mutex_out);
+
                 mutex_out->unlock();
+
                 if(swap_buffers) {
                     swap_buffers = false;
                     time_deint_cell = buffer_b;
@@ -372,7 +371,9 @@ void time_deinterleaver::execute(int _len_in, complex* _ofdm_cell)
         }
         ++idx_cell;
     }
+
     mutex_in->unlock();
+
 }
 //-------------------------------------------------------------------------------------------
 void time_deinterleaver::stop()

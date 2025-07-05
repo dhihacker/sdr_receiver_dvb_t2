@@ -25,10 +25,7 @@
 #define BIT_PACKET_LENGTH (TRANSPORT_PACKET_LENGTH * 8)
 
 //------------------------------------------------------------------------------------------
-bb_de_header::bb_de_header(QWaitCondition *_signal_in, QMutex *_mutex_in, QObject *parent) :
-    QObject(parent),
-    signal_in(_signal_in),
-    mutex_in(_mutex_in)
+bb_de_header::bb_de_header(QObject *parent) :  QObject(parent)
 {
     init_crc8_table();
     len = 53840 / 8 + TRANSPORT_PACKET_LENGTH * 2;//split tail ?
@@ -83,12 +80,6 @@ uint8_t  bb_de_header::check_crc8_mode(uint8_t *_in, int _len_in)
 //------------------------------------------------------------------------------------------
 void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in, uint8_t* _in)
 {
-    mutex_in->lock();
-    signal_in->wakeOne();
-
-//                mutex_in->unlock();
-//                return;
-
     l1_postsignalling l1_post = _l1_post;
     int len_in = _len_in;
     uint8_t* in = _in;
@@ -107,9 +98,11 @@ void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in,
         break;
     default:
         info_already_set = false;
+
         emit ts_stage("Baseband header CRC8 error.");
-        mutex_in->unlock();
+
         return;
+
     }
     bb_header header;
     header.ts_gs = *in++ << 1;
@@ -137,8 +130,9 @@ void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in,
     if(!info_already_set) set_info(_plp_id, l1_post, mode, header);
 
     if(need_plp != _plp_id) {
-        mutex_in->unlock();
+
         return;
+
     }
     for (int i = 15; i >= 0; --i) {
       header.upl |= *in++ << i;
@@ -158,8 +152,9 @@ void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in,
       header.syncd |= *in++ << i;
     }
     if(header.syncd == 65535) {
-        mutex_in->unlock();
+
         return;
+
     }
     in += 8;
 
@@ -216,7 +211,9 @@ void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in,
                     *ptr_error_indicator |= TRANSPORT_ERROR_INDICATOR;
                 }
                 crc = 0;
+
                 emit ts_stage("Baseband header resynchronizing.");
+
             }
             else{
                 for (int i = 0; i < syncd_byte; ++i) {
@@ -236,7 +233,9 @@ void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in,
                 }
                 ++errors;
                 *ptr_error_indicator |= TRANSPORT_ERROR_INDICATOR;
+
                 emit ts_stage("Baseband header resynchronizing.");
+
             }
         }
         else {
@@ -364,7 +363,9 @@ void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in,
                     ++idx_packet;
                 }
                 in += header.syncd - len_split * 8;
+
                 emit ts_stage("Baseband header resynchronizing.");
+
             }
             else{
                 for (int i = 0; i < syncd_byte; ++i) {
@@ -382,7 +383,9 @@ void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in,
                     ++len_out;
                     ++idx_packet;
                 }
+
                 emit ts_stage("Baseband header resynchronizing.");
+
             }
         }
         else {
@@ -444,7 +447,6 @@ void bb_de_header::execute(int _plp_id, l1_postsignalling _l1_post, int _len_in,
 
     if(errors != 0) emit ts_stage("TS error.");
 
-    mutex_in->unlock();
 }
 //_____________________________________________________________________________________________
 void bb_de_header::set_info(int _plp_id, l1_postsignalling _l1_post,

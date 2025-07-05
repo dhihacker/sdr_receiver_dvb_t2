@@ -26,9 +26,8 @@
 #endif
 
 //------------------------------------------------------------------------------------------
-llr_demapper::llr_demapper(QWaitCondition *_signal_in, QMutex* _mutex, QObject* parent) :
+llr_demapper::llr_demapper(QMutex* _mutex, QObject* parent) :
     QObject(parent),
-    signal_in(_signal_in),
     mutex_in(_mutex)
 {
     derotate_qpsk.real(cos(-ROT_QPSK));
@@ -76,12 +75,10 @@ llr_demapper::llr_demapper(QWaitCondition *_signal_in, QMutex* _mutex, QObject* 
     buffer_a = new int8_t[FEC_SIZE_NORMAL * SIZEOF_SIMD];
     buffer_b = new int8_t[FEC_SIZE_NORMAL * SIZEOF_SIMD];
 
-    mutex_out = new QMutex;
-    signal_out = new QWaitCondition;
-    decoder = new ldpc_decoder(signal_out, mutex_out);
+    decoder = new ldpc_decoder;
     thread = new QThread;
     decoder->moveToThread(thread);
-    connect(this, &llr_demapper::soft_multiplexer_de_twist, decoder, &ldpc_decoder::execute);
+    connect(this, &llr_demapper::soft_multiplexer_de_twist, decoder, &ldpc_decoder::execute, Qt::BlockingQueuedConnection);
     connect(this, &llr_demapper::stop_decoder, decoder, &ldpc_decoder::stop);
     connect(decoder, &ldpc_decoder::finished, decoder, &ldpc_decoder::deleteLater);
     connect(decoder, &ldpc_decoder::finished, thread, &QThread::quit, Qt::DirectConnection);
@@ -133,7 +130,7 @@ void llr_demapper::execute(int _ti_block_size, complex* _time_deint_cell,
                                int _plp_id, l1_postsignalling _l1_post)
 {
     mutex_in->lock();
-    signal_in->wakeOne();
+
     int plp_id = _plp_id;
     l1_postsignalling l1_post = _l1_post;
     int len_in = _ti_block_size;
@@ -154,7 +151,9 @@ void llr_demapper::execute(int _ti_block_size, complex* _time_deint_cell,
     default:
         break;
     }
+
     mutex_in->unlock();
+
 }
 //------------------------------------------------------------------------------------------
 void llr_demapper::qpsk(int _plp_id, l1_postsignalling _l1_post, int _len_in, complex* _in)
@@ -193,7 +192,9 @@ void llr_demapper::qpsk(int _plp_id, l1_postsignalling _l1_post, int _len_in, co
         sum_e += std::norm(e);
     }
     snr = 10.0f * std::log10(sum_s / sum_e);
+
     emit signal_noise_ratio(snr);
+
     precision = 8.0f * NORM_FACTOR_QPSK * sum_s / sum_e;
     //soft demap
     for(int i = 0; i < len_in; ++i) {
@@ -209,19 +210,20 @@ void llr_demapper::qpsk(int _plp_id, l1_postsignalling _l1_post, int _len_in, co
             if(blocks == SIZEOF_SIMD) {
                 blocks = 0;
                 int len_out = fec_size * SIZEOF_SIMD;
-                mutex_out->lock();
                 if(swap_buffer) {
                     swap_buffer = false;
+
                     emit soft_multiplexer_de_twist(idx_plp_simd, l1_post, len_out, buffer_a);
+
                     out = buffer_b;
                 }
                 else {
                     swap_buffer = true;
+
                     emit soft_multiplexer_de_twist(idx_plp_simd, l1_post, len_out, buffer_b);
+
                     out = buffer_a;
                 }
-                signal_out->wait(mutex_out);
-                mutex_out->unlock();
             }
         }
     }
@@ -278,7 +280,9 @@ void llr_demapper::qam16(int _plp_id, l1_postsignalling _l1_post, int _len_in, c
         sum_e += std::norm(e);
     }
     snr = 20.0f * std::log10(sum_s / sum_e);
+
     emit signal_noise_ratio(snr);
+
     //soft demap
     int* address;
     int* address_begin = nullptr;
@@ -345,19 +349,20 @@ void llr_demapper::qam16(int _plp_id, l1_postsignalling _l1_post, int _len_in, c
             if(blocks == SIZEOF_SIMD){
                 blocks = 0;
                 int len_out = fec_size * SIZEOF_SIMD;
-                mutex_out->lock();
                 if(swap_buffer) {
                     swap_buffer = false;
+
                     emit soft_multiplexer_de_twist(idx_plp_simd, l1_post, len_out, buffer_a);
+
                     out = buffer_b;
                 }
                 else {
                     swap_buffer = true;
+
                     emit soft_multiplexer_de_twist(idx_plp_simd, l1_post, len_out, buffer_b);
+
                     out = buffer_a;
                 }
-                signal_out->wait(mutex_out);
-                mutex_out->unlock();
             }
         }
     }
@@ -437,7 +442,9 @@ void llr_demapper::qam64(int _plp_id, l1_postsignalling _l1_post, int _len_in, c
         sum_e += std::norm(e);
     }
     snr = 20.0f * std::log10(sum_s / sum_e);
+
     emit signal_noise_ratio(snr);
+
     //soft demap
     int* address;
     int* address_begin = nullptr;
@@ -516,19 +523,20 @@ void llr_demapper::qam64(int _plp_id, l1_postsignalling _l1_post, int _len_in, c
             if(blocks == SIZEOF_SIMD) {
                 blocks = 0;
                 int len_out = fec_size * SIZEOF_SIMD;
-                mutex_out->lock();
                 if(swap_buffer) {
                     swap_buffer = false;
+
                     emit soft_multiplexer_de_twist(idx_plp_simd, l1_post, len_out, buffer_a);
+
                     out = buffer_b;
                 }
                 else {
                     swap_buffer = true;
+
                     emit soft_multiplexer_de_twist(idx_plp_simd, l1_post, len_out, buffer_b);
+
                     out = buffer_a;
                 }
-                signal_out->wait(mutex_out);
-                mutex_out->unlock();
             }
         }
     }
@@ -657,7 +665,9 @@ void llr_demapper::qam256(int _plp_id, l1_postsignalling _l1_post, int _len_in, 
         sum_e += std::norm(e);
     }
     snr = 20.0f * std::log10(sum_s / sum_e);
+
     emit signal_noise_ratio(snr);
+
     //soft demap
     int* address;
     int* address_begin = nullptr;
@@ -749,19 +759,20 @@ void llr_demapper::qam256(int _plp_id, l1_postsignalling _l1_post, int _len_in, 
             if(blocks == SIZEOF_SIMD){
                 blocks = 0;
                 int len_out = fec_size * SIZEOF_SIMD;
-                mutex_out->lock();
                 if(swap_buffer) {
                     swap_buffer = false;
+
                     emit soft_multiplexer_de_twist(idx_plp_simd, l1_post, len_out, buffer_a);
+
                     out = buffer_b;
                 }
                 else {
                     swap_buffer = true;
+
                     emit soft_multiplexer_de_twist(idx_plp_simd, l1_post, len_out, buffer_b);
+
                     out = buffer_a;
                 }
-                signal_out->wait(mutex_out);
-                mutex_out->unlock();
             }
         }
     }

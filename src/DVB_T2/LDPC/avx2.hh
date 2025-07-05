@@ -21,7 +21,12 @@
 #ifndef AVX2_HH
 #define AVX2_HH
 
-#include <immintrin.h>
+
+#ifdef WIN32
+#include <intrin.h>
+#else
+ #include <immintrin.h>
+#endif
 #include <stdint.h>
 //#include "simd.hh"
 

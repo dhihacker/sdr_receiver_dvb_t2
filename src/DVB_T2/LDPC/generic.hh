@@ -28,6 +28,8 @@
 #include "exclusive_reduce.hh"
 
 // typedef u_int8_t uint8_t;
+namespace gnr
+{
 
 template <typename TYPE>
 struct NormalUpdate
@@ -58,9 +60,9 @@ struct MinSumAlgorithm
   {
     return 1;
   }
-  static TYPE min(TYPE a, TYPE b)
+  static TYPE min_2(TYPE a, TYPE b)
   {
-    return std::min(a, b);
+      return std::min(a, b);
   }
   static TYPE sign(TYPE a, TYPE b)
   {
@@ -71,7 +73,7 @@ struct MinSumAlgorithm
     TYPE mags[cnt], mins[cnt];
     for (int i = 0; i < cnt; ++i)
       mags[i] = std::abs(links[i]);
-    CODE::exclusive_reduce(mags, mins, cnt, min);
+    CODE::exclusive_reduce(mags, mins, cnt, min_2);
 
     TYPE signs[cnt];
     CODE::exclusive_reduce(links, signs, cnt, sign);
@@ -108,7 +110,7 @@ struct MinSumAlgorithm<float, UPDATE>
   {
     return 1.f;
   }
-  static float min(float a, float b)
+  static float min_2(float a, float b)
   {
     return std::min(a, b);
   }
@@ -122,7 +124,7 @@ struct MinSumAlgorithm<float, UPDATE>
     float mags[cnt], mins[cnt];
     for (int i = 0; i < cnt; ++i)
       mags[i] = std::abs(links[i]);
-    CODE::exclusive_reduce(mags, mins, cnt, min);
+    CODE::exclusive_reduce(mags, mins, cnt, min_2);
 
     int signs[cnt];
     CODE::exclusive_reduce(reinterpret_cast<int *>(links), signs, cnt, xor_);
@@ -177,7 +179,7 @@ struct MinSumAlgorithm<int8_t, UPDATE>
     x = std::min<int16_t>(std::max<int16_t>(x, -128), 127);
     return x;
   }
-  static int8_t min(int8_t a, int8_t b)
+  static int8_t min_2(int8_t a, int8_t b)
   {
     return std::min(a, b);
   }
@@ -198,7 +200,7 @@ struct MinSumAlgorithm<int8_t, UPDATE>
     int8_t mags[cnt], mins[cnt];
     for (int i = 0; i < cnt; ++i)
       mags[i] = sqabs(links[i]);
-    CODE::exclusive_reduce(mags, mins, cnt, min);
+    CODE::exclusive_reduce(mags, mins, cnt, min_2);
 
     int8_t signs[cnt];
     CODE::exclusive_reduce(links, signs, cnt, xor_);
@@ -229,7 +231,7 @@ struct OffsetMinSumAlgorithm
   {
     return 1;
   }
-  static TYPE min(TYPE a, TYPE b)
+  static TYPE min_2(TYPE a, TYPE b)
   {
     return std::min(a, b);
   }
@@ -243,7 +245,7 @@ struct OffsetMinSumAlgorithm
     TYPE mags[cnt], mins[cnt];
     for (int i = 0; i < cnt; ++i)
       mags[i] = std::max(std::abs(links[i]) - beta, TYPE(0));
-    CODE::exclusive_reduce(mags, mins, cnt, min);
+    CODE::exclusive_reduce(mags, mins, cnt, min_2);
 
     TYPE signs[cnt];
     CODE::exclusive_reduce(links, signs, cnt, sign);
@@ -298,7 +300,7 @@ struct OffsetMinSumAlgorithm<int8_t, UPDATE, FACTOR>
     x = std::max<int16_t>(x, 0);
     return x;
   }
-  static int8_t min(int8_t a, int8_t b)
+  static int8_t min_2(int8_t a, int8_t b)
   {
     return std::min(a, b);
   }
@@ -320,7 +322,7 @@ struct OffsetMinSumAlgorithm<int8_t, UPDATE, FACTOR>
     int8_t mags[cnt], mins[cnt];
     for (int i = 0; i < cnt; ++i)
       mags[i] = subu(sqabs(links[i]), beta);
-    CODE::exclusive_reduce(mags, mins, cnt, min);
+    CODE::exclusive_reduce(mags, mins, cnt, min_2);
 
     int8_t signs[cnt];
     CODE::exclusive_reduce(links, signs, cnt, xor_);
@@ -369,7 +371,7 @@ struct MinSumCAlgorithm
   {
     return b < TYPE(0) ? -a : b > TYPE(0) ? a : TYPE(0);
   }
-  static TYPE min(TYPE a, TYPE b)
+  static TYPE min_2(TYPE a, TYPE b)
   {
     TYPE m = std::min(std::abs(a), std::abs(b));
     TYPE x = sign(sign(m, a), b);
@@ -379,7 +381,7 @@ struct MinSumCAlgorithm
   static void finalp(TYPE *links, int cnt)
   {
     TYPE tmp[cnt];
-    CODE::exclusive_reduce(links, tmp, cnt, min);
+    CODE::exclusive_reduce(links, tmp, cnt, min_2);
     for (int i = 0; i < cnt; ++i)
       links[i] = tmp[i];
   }
@@ -423,7 +425,7 @@ struct MinSumCAlgorithm<float, UPDATE, FACTOR>
       return -c;
     return 0;
   }
-  static float min(float a, float b)
+  static float min_2(float a, float b)
   {
     int mask = 0x80000000;
     float m = std::min(std::abs(a), std::abs(b));
@@ -435,7 +437,7 @@ struct MinSumCAlgorithm<float, UPDATE, FACTOR>
   static void finalp(float *links, int cnt)
   {
     float tmp[cnt];
-    CODE::exclusive_reduce(links, tmp, cnt, min);
+    CODE::exclusive_reduce(links, tmp, cnt, min_2);
     for (int i = 0; i < cnt; ++i)
       links[i] = tmp[i];
   }
@@ -522,7 +524,7 @@ struct MinSumCAlgorithm<int8_t, UPDATE, FACTOR>
       return -c;
     return 0;
   }
-  static int8_t min(int8_t a, int8_t b)
+  static int8_t min_2(int8_t a, int8_t b)
   {
     int8_t m = std::min(sqabs(a), sqabs(b));
     int8_t x = sign(sign(m, a), b);
@@ -532,7 +534,7 @@ struct MinSumCAlgorithm<int8_t, UPDATE, FACTOR>
   static void finalp(int8_t *links, int cnt)
   {
     int8_t tmp[cnt];
-    CODE::exclusive_reduce(links, tmp, cnt, min);
+    CODE::exclusive_reduce(links, tmp, cnt, min_2);
     for (int i = 0; i < cnt; ++i)
       links[i] = tmp[i];
   }
@@ -716,5 +718,7 @@ struct SumProductAlgorithm
     UPDATE::update(a, b);
   }
 };
+
+}
 
 #endif

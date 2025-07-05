@@ -81,7 +81,6 @@ public slots:
 private:
     QThread* thread = nullptr;
     QMutex* mutex_out;
-    QWaitCondition* signal_out;
 
     id_device_t id_device;
     int convert_input = 1;

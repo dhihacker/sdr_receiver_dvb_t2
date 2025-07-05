@@ -15,10 +15,7 @@
 #include "bch_decoder.h"
 
 //------------------------------------------------------------------------------------------
-bch_decoder::bch_decoder(QWaitCondition *_signal_in, QMutex *_mutex_in, QObject *parent) :
-    QObject(parent),
-    signal_in(_signal_in),
-    mutex_in(_mutex_in)
+bch_decoder::bch_decoder(QObject *parent) : QObject(parent)
 {
     buffer_a = new uint8_t[53840];
     buffer_b = new uint8_t[53840];
@@ -26,12 +23,10 @@ bch_decoder::bch_decoder(QWaitCondition *_signal_in, QMutex *_mutex_in, QObject 
 
     init_descrambler();
 
-    mutex_out = new QMutex;
-    signal_out = new QWaitCondition;
-    deheader = new bb_de_header(signal_out, mutex_out);
+    deheader = new bb_de_header;
     thread = new QThread;
     deheader->moveToThread(thread);
-    connect(this, &bch_decoder::bit_descramble, deheader, &bb_de_header::execute);
+    connect(this, &bch_decoder::bit_descramble, deheader, &bb_de_header::execute, Qt::BlockingQueuedConnection);
     connect(this, &bch_decoder::stop_deheader, deheader, &bb_de_header::stop);
     connect(deheader, &bb_de_header::finished, deheader, &bb_de_header::deleteLater);
     connect(deheader, &bb_de_header::finished, thread, &QThread::quit, Qt::DirectConnection);
@@ -62,12 +57,6 @@ void bch_decoder::init_descrambler()
 //------------------------------------------------------------------------------------------
 void bch_decoder::execute(int *_idx_plp_simd, l1_postsignalling _l1_post, int _len_in, uint8_t* _in)
 {
-    mutex_in->lock();
-    signal_in->wakeOne();
-
-//        mutex_in->unlock();
-//        return;
-
     int* plp_id = _idx_plp_simd;
     l1_postsignalling l1_post = _l1_post;
     int len_in = _len_in;
@@ -142,25 +131,22 @@ void bch_decoder::execute(int *_idx_plp_simd, l1_postsignalling _l1_post, int _l
         }
         if(swap_buffer) {
             swap_buffer = false;
-            mutex_out->lock();
+
             emit bit_descramble(plp_id[n], l1_post, k_bch, buffer_a);
-            signal_out->wait(mutex_out);
-            mutex_out->unlock();
+
             ++n;
             out = buffer_b;
         }
         else {
             swap_buffer = true;
-            mutex_out->lock();
+
             emit bit_descramble(plp_id[n], l1_post, k_bch, buffer_b);
-            signal_out->wait(mutex_out);
-            mutex_out->unlock();
+
             ++n;
             out = buffer_a;
         }
     }
 
-     mutex_in->unlock();
 }
 //------------------------------------------------------------------------------------------
 void bch_decoder::stop()

@@ -1,4 +1,4 @@
-/*
+ /*
  *  Copyright 2020 Oleg Malyutin.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -44,7 +44,7 @@ dvbt2_demodulator::dvbt2_demodulator(id_device_t _id_device, float _sample_rate,
         break;
     case id_plutosdr:
         convert_input = 1;
-        short_to_float = 1.0f / (1 << 11);
+        short_to_float = 1.0f / (1 << 10);
         level_max = 0.04f;
         level_min = level_max - 0.02f;
         break;
@@ -79,8 +79,7 @@ dvbt2_demodulator::dvbt2_demodulator(id_device_t _id_device, float _sample_rate,
     fc_demod = new fc_symbol();
     //time deinterleaver and removal of cyclic Q-delay
     mutex_out = new QMutex;
-    signal_out = new QWaitCondition;
-    deinterleaver = new time_deinterleaver(signal_out, mutex_out);
+    deinterleaver = new time_deinterleaver(mutex_out);
     thread = new QThread;
     deinterleaver->moveToThread(thread);
     connect(this, &dvbt2_demodulator::data, deinterleaver, &time_deinterleaver::execute);
@@ -346,10 +345,13 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
             complex* deinterleaved_cell = data_demodulator->execute(idx_symbol, ofdm_cell,
                                                               sample_rate_est, phase_est);
             if(deint_start) {
+
                 mutex_out->lock();
+
                 emit data(dvbt2.c_data, deinterleaved_cell);
-                signal_out->wait(mutex_out);
+
                 mutex_out->unlock();
+
             }
             ++idx_symbol;
             if(idx_symbol == end_data_symbol) {
@@ -360,10 +362,13 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
         else if(next_symbol_type == SYMBOL_TYPE_FC) {
             complex* deinterleaved_cell = fc_demod->execute(ofdm_cell, sample_rate_est, phase_est);
             if(deint_start) {
+
                 mutex_out->lock();
+
                 emit data(dvbt2.n_fc, deinterleaved_cell);
-                signal_out->wait(mutex_out);
+
                 mutex_out->unlock();
+
             }
             next_symbol_type = SYMBOL_TYPE_P1;
         }
@@ -379,12 +384,17 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
                         if(!deint_start) {
                             deinterleaver->start(dvbt2, l1_pre, l1_post);
                             deint_start = true;
+
                             emit amount_plp(l1_post.num_plp);
+
                         }
+
                         mutex_out->lock();
+
                         emit l1_dyn_execute(l1_post, dvbt2.c_p2, deinterleaved_cell);
-                        signal_out->wait(mutex_out);
+
                         mutex_out->unlock();
+
                     }
                     ++idx_symbol;
                     next_symbol_type = SYMBOL_TYPE_DATA;

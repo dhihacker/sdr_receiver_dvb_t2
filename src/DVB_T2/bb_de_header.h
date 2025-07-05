@@ -16,8 +16,6 @@
 #define BB_DE_HEADER_H
 
 #include <QObject>
-#include <QMutex>
-#include <QWaitCondition>
 #include <QUdpSocket>
 #include <QFile>
 
@@ -43,7 +41,7 @@ class bb_de_header : public QObject
 {
     Q_OBJECT
 public:
-    explicit bb_de_header(QWaitCondition* _signal_in, QMutex* _mutex_in, QObject *parent = nullptr);
+    explicit bb_de_header(QObject *parent = nullptr);
     ~bb_de_header();
 
     enum id_out{
@@ -61,9 +59,6 @@ public slots:
     void stop();
 
 private:
-    QWaitCondition* signal_in;
-    QMutex* mutex_in;
-    QMutex* mutex_out;
     int plp_id = 0;
     uint8_t  crc = 0;
     uint8_t crc_table[256];

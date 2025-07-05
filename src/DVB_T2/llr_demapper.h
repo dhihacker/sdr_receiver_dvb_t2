@@ -17,7 +17,6 @@
 
 #include <QObject>
 #include <QThread>
-#include <QWaitCondition>
 #include <QMutex>
 #include <complex>
 
@@ -30,7 +29,7 @@ class llr_demapper : public QObject
 {
     Q_OBJECT
 public:
-    explicit llr_demapper(QWaitCondition *_signal_in, QMutex* _mutex, QObject *parent = nullptr);
+    explicit llr_demapper(QMutex* _mutex, QObject *parent = nullptr);
     ~llr_demapper();
     ldpc_decoder* decoder;
 
@@ -46,11 +45,8 @@ public slots:
     void stop();
 
 private:
-    QWaitCondition* signal_in;
     QThread* thread;
-    QWaitCondition* signal_out;
     QMutex* mutex_in;
-    QMutex* mutex_out;
     l1_postsignalling l1_post;
     int8_t* buffer_a = nullptr;
     int8_t* buffer_b = nullptr;
@@ -122,6 +118,7 @@ private:
     void qam256(int _plp_id, l1_postsignalling _l1_post, int _len_in, complex* _in);
 
     inline int8_t quantize(float &_precision, float _in);
+
 };
 
 #endif // LLR_DEMAPPER_H

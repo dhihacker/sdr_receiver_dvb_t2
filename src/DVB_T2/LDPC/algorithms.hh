@@ -25,6 +25,9 @@
 #include "exclusive_reduce.hh"
 #include "simd.hh"
 
+namespace gnr
+{
+
 template <typename VALUE, int WIDTH>
 struct SelfCorrectedUpdate<SIMD<VALUE, WIDTH>>
 {
@@ -47,7 +50,7 @@ struct MinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE>
   {
     return vdup<TYPE>(1);
   }
-  static TYPE min(TYPE a, TYPE b)
+  static TYPE min_2(TYPE a, TYPE b)
   {
     return vmin(a, b);
   }
@@ -60,7 +63,7 @@ struct MinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE>
     TYPE mags[cnt], mins[cnt];
     for (int i = 0; i < cnt; ++i)
       mags[i] = vabs(links[i]);
-    CODE::exclusive_reduce(mags, mins, cnt, min);
+    CODE::exclusive_reduce(mags, mins, cnt, min_2);
 
     TYPE signs[cnt];
     CODE::exclusive_reduce(links, signs, cnt, sign);
@@ -174,7 +177,7 @@ struct OffsetMinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR>
   {
     return vdup<TYPE>(1);
   }
-  static TYPE min(TYPE a, TYPE b)
+  static TYPE min_2(TYPE a, TYPE b)
   {
     return vmin(a, b);
   }
@@ -188,7 +191,7 @@ struct OffsetMinSumAlgorithm<SIMD<VALUE, WIDTH>, UPDATE, FACTOR>
     TYPE mags[cnt], mins[cnt];
     for (int i = 0; i < cnt; ++i)
       mags[i] = vmax(vsub(vabs(links[i]), beta), vzero<TYPE>());
-    CODE::exclusive_reduce(mags, mins, cnt, min);
+    CODE::exclusive_reduce(mags, mins, cnt, min_2);
 
     TYPE signs[cnt];
     CODE::exclusive_reduce(links, signs, cnt, sign);
@@ -422,5 +425,7 @@ struct MinSumCAlgorithm<SIMD<int8_t, WIDTH>, UPDATE, FACTOR>
     UPDATE::update(a, vmin(vmax(b, vdup<TYPE>(-32)), vdup<TYPE>(31)));
   }
 };
+
+}
 
 #endif

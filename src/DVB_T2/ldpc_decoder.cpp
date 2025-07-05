@@ -77,10 +77,7 @@ constexpr int DVB_T2_TABLE_B9::DEG[];
 constexpr int DVB_T2_TABLE_B9::LEN[];
 constexpr int DVB_T2_TABLE_B9::POS[];
 //------------------------------------------------------------------------------------------
-ldpc_decoder::ldpc_decoder(QWaitCondition* _signal_in, QMutex *_mutex_in, QObject *parent) :
-    QObject(parent),
-    signal_in(_signal_in),
-    mutex_in(_mutex_in)
+ldpc_decoder::ldpc_decoder(QObject *parent) : QObject(parent)
 {
     ldpc_fec_normal_cod_1_2 = new LDPC<DVB_T2_TABLE_NORMAL_C1_2>();
     ldpc_fec_normal_cod_3_4 = new LDPC<DVB_T2_TABLE_NORMAL_C3_4>();
@@ -121,12 +118,10 @@ ldpc_decoder::ldpc_decoder(QWaitCondition* _signal_in, QMutex *_mutex_in, QObjec
     buffer_b = new uint8_t[len_buffer];
     bch_fec = buffer_a;
 
-    mutex_out = new QMutex;
-    signal_out = new QWaitCondition;
-    decoder = new bch_decoder(signal_out, mutex_out);
+    decoder = new bch_decoder;
     thread = new QThread;
     decoder->moveToThread(thread);
-    connect(this, &ldpc_decoder::bit_bch, decoder, &bch_decoder::execute);
+    connect(this, &ldpc_decoder::bit_bch, decoder, &bch_decoder::execute, Qt::BlockingQueuedConnection);
     connect(this, &ldpc_decoder::stop_decoder, decoder, &bch_decoder::stop);
     connect(decoder, &bch_decoder::finished, decoder, &bch_decoder::deleteLater);
     connect(decoder, &bch_decoder::finished, thread, &QThread::quit, Qt::DirectConnection);
@@ -151,19 +146,12 @@ ldpc_decoder::~ldpc_decoder()
     delete ldpc_fec_short_cod_4_5;
     delete ldpc_fec_short_cod_5_6;
     delete [] ldpc_fec;
-    delete [] bch_fec;
+    delete [] buffer_a;
+    delete [] buffer_b;
 }
 //------------------------------------------------------------------------------------------
 void ldpc_decoder::execute(int* _idx_plp_simd, l1_postsignalling _l1_post, int _len_in, int8_t* _in)
 {
-    mutex_in->lock();
-    signal_in->wakeOne();
-
-//    if(_idx_plp_simd[0]==0){
-//        mutex_in->unlock();
-//        return;
-//    }
-
     int* plp_id = _idx_plp_simd;
     l1_postsignalling l1_post = _l1_post;
     int8_t* in = _in;
@@ -263,8 +251,9 @@ void ldpc_decoder::execute(int* _idx_plp_simd, l1_postsignalling _l1_post, int _
     int count = (*p_decode)(simd, simd + k_ldpc, trials, SIZEOF_SIMD);
     if (count < 0) {
         fprintf(stderr, "LDPC decoder could not recover the codeword! %d\n", count);
-        mutex_in->unlock();
+
         return;
+
     }
 
     int8_t *s;
@@ -276,28 +265,22 @@ void ldpc_decoder::execute(int* _idx_plp_simd, l1_postsignalling _l1_post, int _
         }
     }
 
-//    bch_fec = buffer_a;
-
-
     int len_out = k_ldpc * SIZEOF_SIMD;
     if(swap_buffer) {
         swap_buffer = false;
-        mutex_out->lock();
+
         emit bit_bch(plp_id, l1_post, len_out, buffer_a);
-        signal_out->wait(mutex_out);
-        mutex_out->unlock();
+
         bch_fec = buffer_b;
     }
     else {
         swap_buffer = true;
-        mutex_out->lock();
+
         emit bit_bch(plp_id, l1_post, len_out, buffer_b);
-        signal_out->wait(mutex_out);
-        mutex_out->unlock();
+
         bch_fec = buffer_a;
     }
 
-    mutex_in->unlock();
 }
 //------------------------------------------------------------------------------------------
 void ldpc_decoder::stop()

@@ -18,7 +18,6 @@
 #include <QObject>
 #include <QThread>
 #include <QMutex>
-#include <QWaitCondition>
 
 #include "dvbt2_definition.h"
 #include "bb_de_header.h"
@@ -27,7 +26,7 @@ class bch_decoder : public QObject
 {
     Q_OBJECT
 public:
-    explicit bch_decoder(QWaitCondition* _signal_in, QMutex* _mutex_in, QObject *parent = nullptr);
+    explicit bch_decoder(QObject *parent = nullptr);
     ~bch_decoder();
     bb_de_header* deheader;
 
@@ -42,11 +41,7 @@ public slots:
     void stop();
 
 private:
-    QWaitCondition* signal_in;
     QThread* thread;
-    QWaitCondition* signal_out;
-    QMutex* mutex_in;
-    QMutex* mutex_out;
     uint8_t* out = nullptr;
     uint8_t* buffer_a = nullptr;
     uint8_t* buffer_b = nullptr;

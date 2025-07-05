@@ -17,8 +17,6 @@
 
 #include <QObject>
 #include <QThread>
-#include <QWaitCondition>
-#include <QMutex>
 
 #include "dvbt2_definition.h"
 #include "bch_decoder.h"
@@ -57,8 +55,8 @@ typedef MinSumAlgorithm<simd_type, update_type> algorithm_type;
 const int TRIALS = 1;//
 #else
 #include "LDPC/layered_decoder.hh"
-typedef NormalUpdate<simd_type> update_type;
-typedef OffsetMinSumAlgorithm<simd_type, update_type, FACTOR> algorithm_type;
+typedef gnr::NormalUpdate<simd_type> update_type;
+typedef gnr::OffsetMinSumAlgorithm<simd_type, update_type, FACTOR> algorithm_type;
 const int TRIALS = 25;//25
 #endif
 
@@ -76,7 +74,7 @@ class ldpc_decoder : public QObject
 {
     Q_OBJECT
 public:
-    explicit ldpc_decoder(QWaitCondition* _signal_in, QMutex* _mutex_in, QObject *parent = nullptr);
+    explicit ldpc_decoder(QObject *parent = nullptr);
     ~ldpc_decoder();
     bch_decoder* decoder;
 
@@ -91,11 +89,7 @@ public slots:
     void stop();
 
 private:
-    QWaitCondition* signal_in;
     QThread* thread;
-    QWaitCondition* signal_out;
-    QMutex* mutex_in;
-    QMutex* mutex_out;
     uint8_t* ldpc_fec;
     uint8_t* bch_fec;
     uint8_t* buffer_a = nullptr;
