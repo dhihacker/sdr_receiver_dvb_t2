@@ -43,7 +43,7 @@ If you find this project useful, consider donating:
 Used in the project Qt C++ widget QCustomPlot
 (necessary files are included in the project): https://www.qcustomplot.com/.
 The LDPC block is a port of the code in: https://github.com/drmpeg/gr-dvbs2rx.
-The PLUTOSDR kernel patch has been ported and modified from: https://github.com/Hoernchen/plutosdr-fw.
+The PLUTOSDR usb patch has been ported and modified from: [https://github.com/Hoernchen/plutosdr-fw.](https://github.com/pgreenland/pluto-sdr-usb-gadget)
 
 
 
