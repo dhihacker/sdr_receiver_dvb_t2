@@ -22,15 +22,21 @@ main_window::main_window(QWidget *parent)
 {
     ui->setupUi(this);
 
+    sd = new scan_usb_device;
+    connect(sd, &scan_usb_device::found, this, &main_window::device_found);
+    timer_sd = new QTimer;
+    connect(timer_sd, &QTimer::timeout, sd, &scan_usb_device::scan);
+    timer_sd->start(1000);
+
     connect(ui->action_sdrplay, SIGNAL(triggered()), this, SLOT(open_sdrplay()));
     connect(ui->action_airspy, SIGNAL(triggered()), this, SLOT(open_airspy()));
     ui->action_plutosdr->setVisible(false);
     ui->action_plutosdr->setEnabled(false);
-#ifndef WIN32
+// #ifndef WIN32
     ui->action_plutosdr->setVisible(true);
     ui->action_plutosdr->setEnabled(true);
     connect(ui->action_plutosdr, SIGNAL(triggered()), this, SLOT(open_plutosdr()));
-#endif
+// #endif
     connect(ui->action_exit, SIGNAL(triggered()), this, SLOT(close()));
 
     ui->tab_widget->setCurrentIndex(0);
@@ -39,6 +45,7 @@ main_window::main_window(QWidget *parent)
     ui->push_button_stop->setEnabled(false);
     ui->push_button_ts_open_file->setEnabled(false);
     ui->push_button_ts_apply->setEnabled(false);
+    ui->lineEdit_ip->setInputMask("000.000.000.000");
 
     p1_spectrograph = new plot(ui->widget_fft_plot_p1, type_spectrograph, "Fast Fourier transform spectrum");
     p1_constelation = new plot(ui->widget_constellation_plot_p1, type_constelation, "Constellation diagram");
@@ -76,6 +83,22 @@ main_window::~main_window()
     delete p2_equalizer_oscilloscope;
     delete frequency_offset;
     delete button_group_p2_symbol;
+}
+//------------------------------------------------------------------------------------------------
+void main_window::device_found(ushort id_vendor, ushort id_product)
+{
+    if(id_vendor == 0x0456 &&  id_product == 0xb673){
+        timer_sd->stop();
+        qDebug() << "PlutoSDR";
+    }
+    else if(id_vendor == 0x1d50 &&  id_product == 0x60a1){
+        timer_sd->stop();
+        qDebug() << "AirSpy";
+    }
+    else if(id_vendor == 0x1df7 &&  id_product == 0x2500){
+        timer_sd->stop();
+        qDebug() << "SDRPlay";
+    }
 }
 //------------------------------------------------------------------------------------------------
 //void main_window::closeEvent(QCloseEvent *event)
@@ -212,14 +235,21 @@ void main_window::status_airspy(int _err)
                                   QString::fromStdString(ptr_airspy->error(_err)) + "\n");
 }
 //------------------------------------------------------------------------------------------------
-#ifndef WIN32
+// #ifndef WIN32
 void main_window::open_plutosdr()
 {
    int err;
+
+   QString qip = "192.168.002.001";
+   ui->lineEdit_ip->setText(qip);
+
+   std::string ip = ui->lineEdit_ip->text().toStdString();
    std::string ser_no;
    std::string hw_ver;
-   ptr_plutosdr = new rx_plutosdr;
-   err = ptr_plutosdr->get(ser_no, hw_ver);
+   ptr_plutosdr = new rx_plutosdr_daemon;
+   ui->text_log->insertPlainText("Get PlutoSDR: wait for load usb daemon ...\n");
+   ui->text_log->repaint();
+   err = ptr_plutosdr->get(ip, ser_no, hw_ver);
    ui->text_log->insertPlainText("Get PlutoSDR:" +
                                  QString::fromStdString(ptr_plutosdr->error(err)) + "\n");
    if(err < 0) return;
@@ -256,9 +286,9 @@ int main_window::start_plutosdr()
    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
    thread->start(QThread::TimeCriticalPriority);
 
-   connect(ptr_plutosdr, &rx_plutosdr::status, this, &main_window::status_plutosdr);
-   connect(ptr_plutosdr, &rx_plutosdr::radio_frequency, this, &main_window::radio_frequency);
-   connect(ptr_plutosdr, &rx_plutosdr::level_gain, this, &main_window::level_gain);
+   connect(ptr_plutosdr, &rx_plutosdr_daemon::status, this, &main_window::status_plutosdr);
+   connect(ptr_plutosdr, &rx_plutosdr_daemon::radio_frequency, this, &main_window::radio_frequency);
+   connect(ptr_plutosdr, &rx_plutosdr_daemon::level_gain, this, &main_window::level_gain);
 
     return 0;
 }
@@ -268,7 +298,7 @@ void main_window::status_plutosdr(int _err)
    ui->text_log->insertPlainText("Status PlutoSDR:"  " "  +
                                  QString::fromStdString(ptr_plutosdr->error(_err)) + "\n");
 }
-#endif
+// #endif
 //------------------------------------------------------------------------------------------------
 void main_window::on_push_button_start_clicked()
 {
@@ -286,14 +316,14 @@ void main_window::on_push_button_start_clicked()
 
         dvbt2 = ptr_airspy->demodulator;
         break;
-#ifndef WIN32
+// #ifndef WIN32
     case id_plutosdr:
 
         if(start_plutosdr() != 0) return;
 
         dvbt2 = ptr_plutosdr->demodulator;
         break;
-#endif
+// #endif
     }
     for(int i = 1; i < ui->tab_widget->count(); ++i) ui->tab_widget->setTabEnabled(i, true);
     connect_info();

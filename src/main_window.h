@@ -17,11 +17,13 @@
 
 #include <QMainWindow>
 
+#include "list_device/scan_usb_device.h"
 #include "rx_sdrplay.h"
 #include "rx_airspy.h"
-#ifndef WIN32
-#include "rx_plutosdr.h"
-#endif
+// #ifndef WIN32
+//#include "rx_plutosdr.h"
+#include "rx_plutosdr_daemon.h"
+// #endif
 #include "plot.h"
 #include "DVB_T2/dvbt2_demodulator.h"
 
@@ -49,15 +51,16 @@ signals:
     void stop_device();
 
 private slots:
+    void device_found(ushort id_vendor, ushort id_product);
     void open_sdrplay();
     void status_sdrplay(int _err);
 
     void open_airspy();
     void status_airspy(int _err);
-#ifndef WIN32
+// #ifndef WIN32
     void open_plutosdr();
     void status_plutosdr(int _err);
-#endif
+// #endif
     void radio_frequency(double _rf);
     void level_gain(int _gain);
     void bad_signal();
@@ -84,6 +87,8 @@ private slots:
 private:
     Ui::main_window *ui;
 
+    scan_usb_device *sd;
+    QTimer *timer_sd;
     id_device_t id_device;
     dvbt2_demodulator* dvbt2;
     QThread* thread = nullptr;
@@ -91,10 +96,11 @@ private:
     rx_airspy* ptr_airspy;
     int start_sdrplay();
     int start_airspy();
-#ifndef WIN32
-    rx_plutosdr* ptr_plutosdr;
+// #ifndef WIN32
+//    rx_plutosdr* ptr_plutosdr;
+    rx_plutosdr_daemon* ptr_plutosdr;
     int start_plutosdr();
-#endif
+// #endif
     void connect_info();
     void disconnect_info();
     QButtonGroup* button_group_p2_symbol;
