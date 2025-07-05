@@ -9,4 +9,4 @@ SUBSYSTEM=="usb",ENV{DEVTYPE}=="usb_device",ATTRS{idVendor}=="1df7",ATTRS{idProd
 SUBSYSTEM=="usb",ENV{DEVTYPE}=="usb_device",ATTRS{idVendor}=="1df7",ATTRS{idProduct}=="3010",MODE:="0666"
 SUBSYSTEM=="usb",ENV{DEVTYPE}=="usb_device",ATTRS{idVendor}=="1df7",ATTRS{idProduct}=="3020",MODE:="0666"
 
-LD_LIBRARY_PATH=. ./sdr_receiver_dvb_t2 $@
+LD_LIBRARY_PATH=. ./sdr_receiver_dvb_t2_v2 $@
