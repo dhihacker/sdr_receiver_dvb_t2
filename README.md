@@ -27,6 +27,9 @@ Tested configurations:
 OS: Linux Mint 20 Ulyana 64-bit. Windows 10 22H2
 Processor: Intel© Core™ i5-8600 CPU @ 3.10GHz × 6
 To view the video signal, a VLC player v2.x (not v.3x) with udp://@:7654 parameters was used (URL)
+Note:
+Shifting (rotating) the antenna by a few cm can improve reception.
+Move with a pause - synchronization takes a few seconds. You can observe the quality of reception by the shape of the P1 symbol.
 
 
 If you find this project useful, consider donating:
