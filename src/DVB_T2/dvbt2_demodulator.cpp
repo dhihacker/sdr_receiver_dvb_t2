@@ -283,7 +283,12 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
                                  buffer_sym, idx_buffer_sym, dvbt2, signal_->coarse_freq_offset,
                                  p1_decoded, signal_->p1_reset)) {
                 if(p2_init){
-                    next_symbol_type = SYMBOL_TYPE_P2;
+                    if(std::abs(signal_->coarse_freq_offset) > 100.0f){
+                        signal_->p1_reset = true;
+                    }
+                    else{
+                        next_symbol_type = SYMBOL_TYPE_P2;
+                    }
                 }
                 else if(signal_->frequency_changed){
                     resample -= signal_->correct_resample * resample;
@@ -437,7 +442,7 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
         }
 
         phase_est_filtered = loop_filter_phase_offset(phase_est * 0.5f, M_PIf32 * 2);
-        double step = 8.0e-9;
+        double step = 8.5e-9;
         if(old_sample_rate_est - sample_rate_est > 0.0f) {
             sample_rate_est_filtered -= step;
             if(resample - sample_rate_est_filtered < -max_resample) sample_rate_est_filtered += step;
