@@ -24,7 +24,7 @@ Not supported:
 2. T2-Lite
 
 Tested configurations:
-OS: Linux Mint 20 Ulyana 64-bit. Windows 10 22H2
+OS: Linux Mint 22 Wilma 64-bit. Windows 10 22H2
 Processor: Intel© Core™ i5-8600 CPU @ 3.10GHz × 6
 To view the video signal, a VLC player v2.x (not v.3x) with udp://@:7654 parameters was used (URL)
 
