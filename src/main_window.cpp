@@ -28,15 +28,16 @@ main_window::main_window(QWidget *parent)
     connect(timer_sd, &QTimer::timeout, sd, &scan_usb_device::scan);
     timer_sd->start(1000);
 
-    connect(ui->action_sdrplay, SIGNAL(triggered()), this, SLOT(open_sdrplay()));
-    connect(ui->action_airspy, SIGNAL(triggered()), this, SLOT(open_airspy()));
+    connect(ui->action_plutosdr, SIGNAL(triggered()), this, SLOT(open_plutosdr()));
     ui->action_plutosdr->setVisible(false);
     ui->action_plutosdr->setEnabled(false);
-// #ifndef WIN32
-    ui->action_plutosdr->setVisible(true);
-    ui->action_plutosdr->setEnabled(true);
-    connect(ui->action_plutosdr, SIGNAL(triggered()), this, SLOT(open_plutosdr()));
-// #endif
+    connect(ui->action_airspy, SIGNAL(triggered()), this, SLOT(open_airspy()));
+    ui->action_airspy->setVisible(false);
+    ui->action_airspy->setEnabled(false);
+    connect(ui->action_sdrplay, SIGNAL(triggered()), this, SLOT(open_sdrplay()));
+    ui->action_sdrplay->setVisible(false);
+    ui->action_sdrplay->setEnabled(false);
+
     connect(ui->action_exit, SIGNAL(triggered()), this, SLOT(close()));
 
     ui->tab_widget->setCurrentIndex(0);
@@ -88,15 +89,18 @@ main_window::~main_window()
 void main_window::device_found(ushort id_vendor, ushort id_product)
 {
     if(id_vendor == 0x0456 &&  id_product == 0xb673){
-        timer_sd->stop();
+        ui->action_plutosdr->setVisible(true);
+        ui->action_plutosdr->setEnabled(true);
         qDebug() << "PlutoSDR";
     }
     else if(id_vendor == 0x1d50 &&  id_product == 0x60a1){
-        timer_sd->stop();
+        ui->action_airspy->setVisible(true);
+        ui->action_airspy->setEnabled(true);
         qDebug() << "AirSpy";
     }
     else if(id_vendor == 0x1df7 &&  id_product == 0x2500){
-        timer_sd->stop();
+        ui->action_sdrplay->setVisible(true);
+        ui->action_sdrplay->setEnabled(true);
         qDebug() << "SDRPlay";
     }
 }
@@ -127,6 +131,7 @@ void main_window::on_check_box_agc_stateChanged(int arg1)
 //------------------------------------------------------------------------------------------------
 void main_window::open_sdrplay()
 {
+    timer_sd->stop();
     int err;
     char* ser_no = nullptr;
     unsigned char hw_ver;
@@ -142,6 +147,7 @@ void main_window::open_sdrplay()
     ui->label_gain->setText("gain reduction(0-85):");
 
     id_device = id_sdrplay;
+    ui->action_sdrplay->setEnabled(false);
     ui->push_button_start->setEnabled(true);
 }
 //------------------------------------------------------------------------------------------------
@@ -181,6 +187,7 @@ void main_window::status_sdrplay(int _err)
 //------------------------------------------------------------------------------------------------
 void main_window::open_airspy()
 {
+    timer_sd->stop();
     int err;
     std::string ser_no;
     std::string hw_ver;
@@ -196,6 +203,7 @@ void main_window::open_airspy()
     ui->label_gain->setText("gain (0-21):");
 
     id_device = id_airspy;
+    ui->action_airspy->setEnabled(false);
     ui->push_button_start->setEnabled(true);
 
 }
@@ -238,6 +246,8 @@ void main_window::status_airspy(int _err)
 // #ifndef WIN32
 void main_window::open_plutosdr()
 {
+   timer_sd->stop();
+
    int err;
 
    QString qip = "192.168.002.001";
@@ -260,6 +270,7 @@ void main_window::open_plutosdr()
    ui->label_gain->setText("gain (0-73):");
 
    id_device = id_plutosdr;
+   ui->action_plutosdr->setEnabled(false);
    ui->push_button_start->setEnabled(true);
 
 }
@@ -336,7 +347,6 @@ void main_window::on_push_button_start_clicked()
 //------------------------------------------------------------------------------------------------
 void main_window::connect_info()
 {
-    connect(dvbt2->p1_demodulator, &p1_symbol::bad_signal, this, &main_window::bad_signal);
     connect(dvbt2->p2_demodulator, &p2_symbol::view_l1_presignalling, this, &main_window::view_l1_presignalling);
     connect(dvbt2->p2_demodulator, &p2_symbol::view_l1_postsignalling, this, &main_window::view_l1_postsignalling);
     connect(dvbt2->p2_demodulator, &p2_symbol::view_l1_dynamic, this, &main_window::view_l1_dynamic);
@@ -381,11 +391,11 @@ void main_window::on_push_button_stop_clicked()
     ui->line_edit_rf->setEnabled(true);
     ui->line_edit_gain->setEnabled(true);
     ui->check_box_agc->setEnabled(true);
+    timer_sd->start(1000);
 }
 //------------------------------------------------------------------------------------------------
 void main_window::disconnect_info()
 {
-    disconnect(dvbt2->p1_demodulator, &p1_symbol::bad_signal, this, &main_window::bad_signal);
     disconnect(dvbt2->p2_demodulator, &p2_symbol::view_l1_presignalling, this, &main_window::view_l1_presignalling);
     disconnect(dvbt2->p2_demodulator, &p2_symbol::view_l1_postsignalling, this, &main_window::view_l1_postsignalling);
     disconnect(dvbt2->p2_demodulator, &p2_symbol::view_l1_dynamic, this, &main_window::view_l1_dynamic);
@@ -461,7 +471,10 @@ void main_window::on_tab_widget_currentChanged(int index)
         connect(dvbt2->p1_demodulator, &p1_symbol::replace_oscilloscope,
                 p1_correlation_oscilloscope, &plot::replace_oscilloscope);
 
-        connect(dvbt2->p2_demodulator, &p2_symbol::replace_oscilloscope,
+//        connect(dvbt2->p2_demodulator, &p2_symbol::replace_oscilloscope,
+//                p2_equalizer_oscilloscope, &plot::replace_oscilloscope);
+
+        connect(dvbt2->data_demodulator, &data_symbol::replace_oscilloscope,
                 p2_equalizer_oscilloscope, &plot::replace_oscilloscope);
 
         connect(dvbt2, &dvbt2_demodulator::replace_null_indicator,
