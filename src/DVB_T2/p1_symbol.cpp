@@ -14,7 +14,7 @@
 */
 #include "p1_symbol.h"
 
-// #include <QDebug>
+ #include <QDebug>
 
 #include "DSP/fast_math.h"
 
@@ -54,63 +54,87 @@ void p1_symbol::init_p1_randomize()
     }
 }
 //-------------------------------------------------------------------------------------------
-/*         chain block diagram
+/*         A-B-C chain block diagram
  * -->__________________________
- *     |     __________         |     __________________    ___________
- *     |    |          |       _|_   |                  |  |           |
- *     |    | delay Tc |____*_/ x \__| run average Tc   |__| delay 2xTb|_______
- *     |    |__________|      \___/  |__________________|  |___________|       |
- *     |         _|_                                                           |
- *     |________/ x \___________                                               |
- *     |        \___/           |                                              |
- *     |     _____|__________   |                                              |
- *     |    |                |  |                                              |
- *     |    |exp(-j2pi*fsh*t)|  |                                              |
- *     |    |________________|  |                                              |
- *     |     __________         |     __________________     __________        |
- *     |    |          |       _|_   |                  |   |          |      _|_      arg max    - time estimate
- *     |____| delay Tb |____*_/ x \__| run average Tb   |___| delay 2  |_____/ x \_--> angle(max) - phase estimate
- *          |__________|      \___/  |__________________|   |__________|     \___/
+ *     |     __________         |     __________________    ____________       _____
+ *     |    |          |       _|_   |                  |  |            |     |     |
+ *     |    | delay Tc |____*_/ x \__| run average Tc   |__| delay 2xTb |_____|__/__|---> angle - phase estimate
+ *     |    |__________|      \___/  |__________________|  |____________|     |_____|
+ *     |         _|_                                                             |
+ *     |________/ x \___________                                                 |
+ *     |        \___/           |                                                |
+ *     |     _____|__________   |                                                |
+ *     |    |                |  |                                                |
+ *     |    |exp(-j2pi*fsh*t)|  |                                                |
+ *     |    |________________|  |                                                |
+ *     |     __________         |     __________________                         |
+ *     |    |          |       _|_   |                  |                        |
+ *     |____| delay Tb |____*_/ x \__| run average Tb   |------------------------------> arg max - time estimate
+ *          |__________|      \___/  |__________________|
  */
-bool p1_symbol::execute(bool _gain_changed, float _level_detect,
+bool p1_symbol::execute(float _level_detect,
                         const int _len_in, complex *_in, int &_consume,
                         complex* _buffer_sym, int &_idx_buffer_sym,
                         dvbt2_parameters &_dvbt2, double &_coarse_freq_offset,
                         bool &_p1_decoded, bool &_reset)
 {
     static int idx_fq_shift = 0;
-    complex data_sihft, a, b, c, d, in_av_c, in_av_b, out_av_c, out_av_b, cor, out;
+    complex data_sihft, a, b, c, in_av_c, in_av_b, out_av_c, out_av_b, cor, out;
     complex* buffer_sym = _buffer_sym;
     int idx_in = _consume;
     int len_in = _len_in;
     complex* in = _in;
     bool p1_detect = false;
-    if(_gain_changed) {
-        begin_threshold = _level_detect * 2.0e+5f;
-        end_threshold = 0.5f * begin_threshold;
-    }
+    const float begin_threshold = _level_detect * 2.5e+3f;
+    const float end_threshold = 0.5f * begin_threshold;
+
     while(idx_in < len_in) {
 
         complex data = in[idx_in++];
         p1_buffer.write(data);
 
+        data_sihft = data * fq_shift[idx_fq_shift++];
+        idx_fq_shift &= 0x3FF;
+        c = delay_c(data_sihft);
+        in_av_c = data * conj(c);
+        b = delay_b(data);
+        in_av_b = data_sihft * conj(b);
+        out_av_c = average_c(in_av_c);
+        out_av_b = average_b(in_av_b);
+        a = delay_b_x2(out_av_c);
+        out = a * out_av_b;
+        const float correlation = norm(out_av_b);
+        cor.real(correlation);
+        cor_buffer.write(cor);
+        if(correlation > begin_threshold) {
+            correlation_detect = true;
+            if(correlation > max_correlation) {
+                max_correlation = correlation;
+                arg_max = out;
+                idx_buffer = -2;//??
+            }
+        }
+
         if(correlation_detect) {
 
-            buffer_sym[idx_buffer] = data;
+            if(idx_buffer > P1_A_PART) {
 
-            if(++idx_buffer > P1_LEN) {
-               // qDebug() << idx_buffer;
                 reset_buffer();
+
             }
 
             if(correlation < end_threshold) {
 
                 p1_detect = true;
-                _idx_buffer_sym = idx_buffer;
 
-                memcpy(in_fft, &p1_buffer.read()[P1_C_PART - idx_buffer],
-                        sizeof(complex) * static_cast<unsigned int>(P1_A_PART));
+                complex *buff = p1_buffer.read();
+
+                memcpy(buffer_sym, &buff[P1_LEN - idx_buffer], sizeof(complex) * idx_buffer);
+                _idx_buffer_sym = idx_buffer;
+                memcpy(in_fft, &buff[P1_C_PART - idx_buffer], sizeof(complex) * static_cast<unsigned int>(P1_A_PART));
+
                 p1_buffer.reset();
+
                 p1_fft = fft->execute();
                 double coarse_freq_offset = atan2_approx(arg_max.imag(), arg_max.real()) * (double)P1_HERTZ_PER_RADIAN;
                 if(!p1_decoded || _reset) {
@@ -131,8 +155,7 @@ bool p1_symbol::execute(bool _gain_changed, float _level_detect,
                 reset_buffer();
 
                 //__show__
-                cor_os = cor_buffer.read();
-                //                    cor_os[0].imag(_coarse_freq_offset);
+                memcpy(cor_os, cor_buffer.read(), sizeof(complex) * static_cast<unsigned int>(P1_A_PART));
                 for(int i = 0; i < P1_ACTIVE_CARRIERS; ++i) {
                     p1_dbpsk[i] = (p1_fft + first_active_carrier)[p1_active_carriers[i]] * 0.1f;
                 }
@@ -144,29 +167,9 @@ bool p1_symbol::execute(bool _gain_changed, float _level_detect,
                 break;
 
             }
-        }
 
-        data_sihft = data * fq_shift[idx_fq_shift++];
-        idx_fq_shift &= 0x3FF;
-        c = delay_c(data_sihft);
-        in_av_c = data * conj(c);
-        b = delay_b(data);
-        in_av_b = data_sihft * conj(b);
-        out_av_c = average_c(in_av_c);
-        out_av_b = average_b(in_av_b);
-        a = delay_b_x2(out_av_c);
-        d = delay_2(out_av_b);
-        out = a * d;
-        correlation = norm(out);
-        cor.real(correlation);
-        cor_buffer.write(cor);
-        if(correlation > begin_threshold) {
-            correlation_detect = true;
-            if(correlation > max_correlation) {
-                max_correlation = correlation;
-                arg_max = out;
-                idx_buffer = 0;
-            }
+            ++idx_buffer;
+
         }
 
     }
@@ -304,7 +307,6 @@ void p1_symbol::reset_buffer()
     delay_c.reset();
     delay_b.reset();
     delay_b_x2.reset();
-    delay_2.reset();
     average_b.reset();
     average_c.reset();
     idx_buffer = 0;

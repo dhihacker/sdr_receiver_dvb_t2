@@ -37,7 +37,7 @@ public:
     explicit p1_symbol(QObject *parent = nullptr);
     ~p1_symbol() override;
 
-    bool execute(bool _gain_changed, float _level_detect,
+    bool execute(float _level_detect,
                  const int _len_in, complex *_in, int &_consume,
                  complex* _buffer_sym, int &_idx_buffer_sym,
                  dvbt2_parameters &_dvbt2, double &_coarse_freq_offset,
@@ -47,28 +47,24 @@ signals:
     void replace_spectrograph(const int _len_data, complex* _data);
     void replace_constelation(const int _len_data, complex* _data);
     void replace_oscilloscope(const int _len_data, complex* _data);
-    void bad_signal();
 
 private:
     complex fq_shift[P1_FREQUENCY_SHIFT];
-    int idx_buffer = 0;
+
     delay_buffer<complex, P1_B_PART>        delay_b;
     delay_buffer<complex, P1_C_PART>        delay_c;
     delay_buffer<complex, P1_B_PART * 2>    delay_b_x2;
-    delay_buffer<complex, 2>                delay_2;
     sum_of_buffer<complex, P1_B_PART>       average_b;
     sum_of_buffer<complex, P1_C_PART>       average_c;
     save_buffer<complex, P1_LEN>            p1_buffer;
     save_buffer<complex, P1_A_PART>         cor_buffer;
+
+    int idx_buffer = 0;
     float correlation = 0;
-
-    /*const */float begin_threshold = 5.0e+5f;// 1.5e+5f FIX ME;
-    /*const */float end_threshold = begin_threshold * 0.5f;
-
     float max_correlation = 0.0;
     bool correlation_detect = false;
     complex arg_max = {0.0, 0.0};
-    complex* cor_os;
+    complex  cor_os[ P1_A_PART];
     int coarse_sample_offset = 0;
     bool p1_decoded = false;
 

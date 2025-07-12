@@ -103,8 +103,10 @@ complex* p2_symbol::execute(dvbt2_parameters &_dvbt2, bool _demod_init, int &_id
     float dif_angle = 0.0f;
     float sum_angle_1 = 0.0f;
     float sum_angle_2 = 0.0f;
-    complex sum_dif_1 = {0.0f, 0.0f};
-    complex sum_dif_2 = {0.0f, 0.0f};
+//    complex sum_dif_1 = {0.0f, 0.0f};
+//    complex sum_dif_2 = {0.0f, 0.0f};
+    float sum_dif_1 = 0.0f;
+    float sum_dif_2 = 0.0f;
     complex sum_pilot_1 = {0.0f, 0.0f};
     complex sum_pilot_2 = {0.0f, 0.0f};
     int idx_symbol = _idx_symbol;
@@ -130,7 +132,7 @@ complex* p2_symbol::execute(dvbt2_parameters &_dvbt2, bool _demod_init, int &_id
     est_dif = cell * conj(old_cell);
     old_cell = cell;
     sum_pilot_1 += est_pilot;
-    sum_dif_1 += est_dif;
+//    sum_dif_1 += est_dif;
     angle_est = atan2_approx(est_pilot.imag(), est_pilot.real());
     amp_est = sqrt(norm(cell)) / amp_pilot;
     //Only for show
@@ -153,13 +155,14 @@ complex* p2_symbol::execute(dvbt2_parameters &_dvbt2, bool _demod_init, int &_id
             old_cell = cell;
             est_pilot = cell * pilot_refer;
             sum_pilot_1 += est_pilot;
-            sum_dif_1 += est_dif;
+//            sum_dif_1 += est_dif;
             angle = atan2_approx(est_pilot.imag(), est_pilot.real());
 
             dif_angle = angle - angle_est;
             if(dif_angle > M_PIf32) dif_angle = M_PIf32 * 2.0f - dif_angle;
             else if(dif_angle < -M_PIf32) dif_angle = M_PIf32 * 2.0f + dif_angle;
             sum_angle_1 += angle;
+            sum_dif_1 += dif_angle;
 
             delta_angle = (dif_angle) / (idx_data + 1);
             amp = sqrt(norm(cell)) / amp_pilot;
@@ -190,17 +193,17 @@ complex* p2_symbol::execute(dvbt2_parameters &_dvbt2, bool _demod_init, int &_id
             break;
         }
     }
-    cell = ofdm_cell[half_total];
-    pilot_refer = pilot_refer_idx_p2_symbol[half_total];
-    est_pilot = cell * pilot_refer;
-    angle = atan2_approx(est_pilot.imag(), est_pilot.real());
-    amp = sqrt(norm(cell)) / amp_pilot;
-    //Only for show
-    est_data[len_est].real(angle);
-    est_data[len_est].imag(amp);
-    ++len_est;
-    // ...
-    for (int i = half_total + 1; i < k_total; ++i){
+//    cell = ofdm_cell[half_total];
+//    pilot_refer = pilot_refer_idx_p2_symbol[half_total];
+//    est_pilot = cell * pilot_refer;
+//    angle = atan2_approx(est_pilot.imag(), est_pilot.real());
+//    amp = sqrt(norm(cell)) / amp_pilot;
+//    //Only for show
+//    est_data[len_est].real(angle);
+//    est_data[len_est].imag(amp);
+//    ++len_est;
+//    // ...
+    for (int i = half_total/* + 1*/; i < k_total; ++i){
         cell = ofdm_cell[i];
         pilot_refer = pilot_refer_idx_p2_symbol[i];
         switch (p2_carrier_map[i]){
@@ -214,13 +217,14 @@ complex* p2_symbol::execute(dvbt2_parameters &_dvbt2, bool _demod_init, int &_id
             old_cell = cell;
             est_pilot = cell * pilot_refer;
             sum_pilot_2 += est_pilot;
-            sum_dif_2 += est_dif;
+//            sum_dif_2 += est_dif;
             angle = atan2_approx(est_pilot.imag(), est_pilot.real());
 
             dif_angle = angle - angle_est;
             if(dif_angle > M_PIf32) dif_angle = M_PIf32 * 2.0f - dif_angle;
             else if(dif_angle < -M_PIf32) dif_angle = M_PIf32 * 2.0f + dif_angle;
             sum_angle_2 += angle;
+            sum_dif_2 += dif_angle;
 
             delta_angle = (dif_angle) / (idx_data + 1);
             amp = sqrt(norm(cell)) / amp_pilot;
@@ -256,7 +260,10 @@ complex* p2_symbol::execute(dvbt2_parameters &_dvbt2, bool _demod_init, int &_id
 
     _phase_offset = (ph_2 + ph_1);
 
-    _sample_rate_offset = (sum_angle_2 - sum_angle_1)/* / k_total*/;
+//    _sample_rate_offset = (sum_angle_2 - sum_angle_1)/* / k_total*/;
+    _sample_rate_offset = (sum_dif_2 - sum_dif_1) / k_total;
+
+//    qDebug() << sum_dif_2 << sum_dif_1 << sum_dif_2 - sum_dif_1;
 
     memcpy(show_symbol, _ofdm_cell, sizeof(complex) * static_cast<unsigned long>(fft_size));
     int len_show = L1_PRE_CELL;

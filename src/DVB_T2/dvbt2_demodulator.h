@@ -103,29 +103,35 @@ private:
 
     float phase_nco = 0.0f;
     float phase_est_filtered = 0.0f;
-    constexpr static float damping_ratio_ = 0.3f;
-    constexpr static int bw_hz_ = 1000000;
-    proportional_integral_loop_filter<float, float, damping_ratio_, bw_hz_,
+    constexpr static float phase_damping_ratio_ = 0.7f;
+    constexpr static int phase_bw_hz_ = 1000000;
+    proportional_integral_loop_filter<float, float, phase_damping_ratio_, phase_bw_hz_,
                                       samplerate_hz> loop_filter_phase_offset;
     float frequency_nco = 0.0f;
     float frequency_est_filtered = 0.0f;
-    constexpr static float damping_ratio = 0.7f;//0.7f
-    constexpr static int bw_hz = 4000000;
-    proportional_integral_loop_filter<float, float, damping_ratio, bw_hz,
+    constexpr static float frequency_damping_ratio = 0.7f;//0.7f
+    constexpr static int frequency_bw_hz = 10000;
+    proportional_integral_loop_filter<float, float, frequency_damping_ratio, frequency_bw_hz,
                                       samplerate_hz> loop_filter_frequency_offset;
 
     double sample_rate_est_filtered = 0.0;
     float old_sample_rate_est = 0.0f;
+
+    constexpr static float sample_rate_damping_ratio = 0.7f;//0.7f
+    constexpr static int sample_rate_bw_hz = 1000;
+    proportional_integral_loop_filter<float, float, sample_rate_damping_ratio, sample_rate_bw_hz,
+                                      samplerate_hz> loop_filter_sample_rate_offset;
 
     complex* out_derotate_sample;
     constexpr static uint upsample = DECIMATION_STEP;
     float sample_rate;
     double resample;
     double max_resample;
+    double min_resample;
 
     complex* out_interpolator;
     complex* out_decimator;
-    interpolator_farrow<complex, float> interpolator;
+    interpolator_farrow_4pt_3rd<complex, float> interpolator;
     filter_decimator* decimator;
 
     dvbt2_parameters dvbt2;

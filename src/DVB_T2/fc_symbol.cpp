@@ -92,8 +92,10 @@ complex* fc_symbol::execute(complex* _ofdm_cell, float &_sample_rate_offset, flo
     float dif_angle = 0.0f;
     float sum_angle_1 = 0.0f;
     float sum_angle_2 = 0.0f;
-    complex sum_dif_1 = {0.0f, 0.0f};
-    complex sum_dif_2 = {0.0f, 0.0f};
+    //    complex sum_dif_1 = {0.0f, 0.0f};
+    //    complex sum_dif_2 = {0.0f, 0.0f};
+        float sum_dif_1 = 0.0f;
+        float sum_dif_2 = 0.0f;
     complex sum_pilot_1 = {0.0f, 0.0f};
     complex sum_pilot_2 = {0.0f, 0.0f};
     int len_show = 0;
@@ -121,7 +123,7 @@ complex* fc_symbol::execute(complex* _ofdm_cell, float &_sample_rate_offset, flo
     est_dif = cell * conj(old_cell);
     old_cell = cell;
     sum_pilot_1 += est_pilot;
-    sum_dif_1 += est_dif;
+//    sum_dif_1 += est_dif;
     angle_est = atan2_approx(est_pilot.imag(), est_pilot.real());
     amp_est = sqrt(norm(cell)) / amp_pilot;
     //__ ... ______________
@@ -140,13 +142,14 @@ complex* fc_symbol::execute(complex* _ofdm_cell, float &_sample_rate_offset, flo
             old_cell = cell;
             est_pilot = cell * pilot_refer;
             sum_pilot_1 += est_pilot;
-            sum_dif_1 += est_dif;
+//            sum_dif_1 += est_dif;
             angle = atan2_approx(est_pilot.imag(), est_pilot.real());
 
             dif_angle = angle - angle_est;
             if(dif_angle > M_PIf32 ) dif_angle = M_PIf32 * 2.0f - dif_angle;
             else if(dif_angle < -M_PIf32) dif_angle = M_PIf32 * 2.0f + dif_angle;
             sum_angle_1 += angle;
+            sum_dif_1 += dif_angle;
 
             delta_angle = (dif_angle) / (idx_data + 1);
             amp = sqrt(norm(cell)) / amp_pilot;
@@ -177,34 +180,34 @@ complex* fc_symbol::execute(complex* _ofdm_cell, float &_sample_rate_offset, flo
         }
     }
 
-    cell = ofdm_cell[half_total];
-    pilot_refer = fc_pilot_refer[half_total];
-    switch (fc_carrier_map[half_total]){
-    case DATA_CARRIER:
-        buffer_cell[idx_data] = cell;
-        ++idx_data;
-        break;
-    case SCATTERED_CARRIER_INVERTED:
-    case SCATTERED_CARRIER:
-        est_dif = cell * conj(old_cell);
-        est_pilot = cell * pilot_refer;
-        angle = atan2_approx(est_pilot.imag(), est_pilot.real());
-        amp = sqrt(norm(cell)) / amp_pilot;
-        //Only for show
-        est_show[len_show].real(angle);
-        est_show[len_show].imag(amp);
-        ++len_show;
-        // ...
-        break;
-    case TRPAPR_CARRIER:
-        //TODO
-        //printf("TRPAPR_CARRIER\n");
-        break;
-    default:
-        break;
-    }
+//    cell = ofdm_cell[half_total];
+//    pilot_refer = fc_pilot_refer[half_total];
+//    switch (fc_carrier_map[half_total]){
+//    case DATA_CARRIER:
+//        buffer_cell[idx_data] = cell;
+//        ++idx_data;
+//        break;
+//    case SCATTERED_CARRIER_INVERTED:
+//    case SCATTERED_CARRIER:
+//        est_dif = cell * conj(old_cell);
+//        est_pilot = cell * pilot_refer;
+//        angle = atan2_approx(est_pilot.imag(), est_pilot.real());
+//        amp = sqrt(norm(cell)) / amp_pilot;
+//        //Only for show
+//        est_show[len_show].real(angle);
+//        est_show[len_show].imag(amp);
+//        ++len_show;
+//        // ...
+//        break;
+//    case TRPAPR_CARRIER:
+//        //TODO
+//        //printf("TRPAPR_CARRIER\n");
+//        break;
+//    default:
+//        break;
+//    }
 
-    for (int i = half_total + 1; i < k_total; ++i){
+    for (int i = half_total/* + 1*/; i < k_total; ++i){
         cell = ofdm_cell[i];
         pilot_refer = fc_pilot_refer[i];
         switch (fc_carrier_map[i]){
@@ -218,13 +221,14 @@ complex* fc_symbol::execute(complex* _ofdm_cell, float &_sample_rate_offset, flo
             old_cell = cell;
             est_pilot = cell * pilot_refer;
             sum_pilot_2 += est_pilot;
-            sum_dif_2 += est_dif;
+//            sum_dif_2 += est_dif;
             angle = atan2_approx(est_pilot.imag(), est_pilot.real());
 
             dif_angle = angle - angle_est;
             if(dif_angle > M_PIf32) dif_angle = M_PIf32 * 2.0f - dif_angle;
             else if(dif_angle < -M_PIf32) dif_angle = M_PIf32 * 2.0f + dif_angle;
             sum_angle_2 += angle;
+            sum_dif_2 += dif_angle;
 
             delta_angle = (dif_angle) / (idx_data + 1);
             amp = sqrt(norm(cell)) / amp_pilot;
@@ -259,7 +263,8 @@ complex* fc_symbol::execute(complex* _ofdm_cell, float &_sample_rate_offset, flo
 
     _phase_offset = (ph_2 + ph_1);
 
-    _sample_rate_offset = (sum_angle_2 - sum_angle_1)/* / k_total*/;
+//        _sample_rate_offset = (sum_angle_2 - sum_angle_1)/* / k_total*/;
+        _sample_rate_offset = (sum_dif_2 - sum_dif_1) / k_total;
 
     int len = n_fc;
     memcpy(show_symbol, _ofdm_cell, sizeof(complex) * static_cast<unsigned int>(fft_size));
