@@ -166,10 +166,10 @@ LIBS += -L$$PWD/libplutosdr/lib_iio/Windows-VS-2019-x64/ -llibiio
 INCLUDEPATH += $$PWD/libplutosdr/lib_iio/include
 DEPENDPATH += $$PWD/libplutosdr/lib_iio/include
 
-# LIBS += -L$$PWD/libpthreads/ -lpthreadVC3
-# INCLUDEPATH += $$PWD/libpthreads
-# DEPENDPATH += $$PWD/libpthreads
-# PRE_TARGETDEPS += $$PWD/libpthreads/pthreadVC3.lib
+LIBS += -L$$PWD/libpthreads/ -lpthreadVC3
+INCLUDEPATH += $$PWD/libpthreads
+DEPENDPATH += $$PWD/libpthreads
+PRE_TARGETDEPS += $$PWD/libpthreads/pthreadVC3.lib
 
 LIBS += -L$$PWD/libplutosdr/libssh/ -lssh
 INCLUDEPATH += $$PWD/libplutosdr/libssh/include
