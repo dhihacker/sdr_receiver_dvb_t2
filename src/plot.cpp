@@ -131,14 +131,14 @@ void plot::replace_oscilloscope(const int _len_data, complex *_data)
     }
     current_plot->graph(0)->data()->clear();
     current_plot->graph(0)->setData(x_data, y_data);
-    if(type == type_oscilloscope_2){
+//    if(type == type_oscilloscope_2){
         for (int i = 0; i < len_data; i++){
             y_data_2[i] = static_cast<double>(_data[i].imag());
             x_data_2[i] = i;
         }
         current_plot->graph(1)->data()->clear();
         current_plot->graph(1)->setData(x_data_2, y_data_2);
-    }
+//    }
 
     emit  repaint_plot();
 }
@@ -206,12 +206,32 @@ void plot::greate_graph(int _len_data, complex *_data)
         current_plot->xAxis->setLabel("Samples");
         current_plot->xAxis->setRange(0, len_data);
         current_plot->yAxis->setLabel("Amplitude");
-        current_plot->yAxis->setRange(0/*min*/, 1.5e+6/*max*/);
+        current_plot->yAxis->setRange(0/*min*/, 2.5e+3/*max*/);
         pen.setColor(Qt::green);
         current_plot->graph(0)->setPen(pen);
         current_plot->graph(0)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssPlusCircle, 3));
         connect(current_plot->xAxis, SIGNAL(rangeChanged(QCPRange)),
                 current_plot->xAxis2, SLOT(setRange(QCPRange)));
+
+        x_data_2.resize(len_data);
+        y_data_2.resize(len_data);
+        current_plot->addGraph(current_plot->xAxis2, current_plot->yAxis2);
+        current_plot->addGraph(current_plot->xAxis2, current_plot->yAxis2);
+        current_plot->xAxis2->setRange(0, len_data);
+        current_plot->yAxis2->setVisible(true);
+        current_plot->yAxis2->setLabel("Amplitude");
+        current_plot->yAxis2->setRange(0/*min*/, 2.5e+3/*max*/);
+        pen.setColor(Qt::red);
+        current_plot->graph(1)->setPen(pen);
+        current_plot->graph(1)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssPlusCircle, 3));
+        connect(current_plot->xAxis, SIGNAL(rangeChanged(QCPRange)),
+                current_plot->xAxis2, SLOT(setRange(QCPRange)));
+        current_plot->graph(1)->setName("amplitude pilot sinal");
+        current_plot->graph(1)->setAntialiasedFill(false);
+        current_plot->graph(1)->data()->clear();
+//        current_plot->legend->setVisible(true);
+//        current_plot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignBottom|Qt::AlignRight);
+
         break;
     case type_oscilloscope_2:
         double d2;
