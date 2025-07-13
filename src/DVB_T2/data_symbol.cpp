@@ -14,7 +14,7 @@
 */
 #include "data_symbol.h"
 
-//#include <QDebug>
+#include <QDebug>
 
 #include "DSP/fast_math.h"
 
@@ -223,42 +223,42 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
             break;
         }
     }
-//    //
-//    cell = ofdm_cell[half_total];
-//    pilot_refer = pilot_refer_idx_data_symbol[half_total];
-//    switch (map[half_total]){
-//    case DATA_CARRIER:
-//        buffer_cell[idx_data] = cell;
-//        ++idx_data;
-//        break;
-//    case CONTINUAL_CARRIER:
-//        amp_pilot = amp_cp;
-//       [[clang::fallthrough]];//_to suppress compiler warnings:
-//        //            break;
-//    case CONTINUAL_CARRIER_INVERTED:
-//        amp_pilot = amp_cp;
-//       [[clang::fallthrough]];//_to suppress compiler warnings:
-//        //            break;
-//    case SCATTERED_CARRIER_INVERTED:
-//    case SCATTERED_CARRIER:
-//        est_dif = cell * conj(old_cell);
-//        est_pilot = cell * pilot_refer;
-//        amp_pilot = amp_sp;
-//        //Only for show
-//        est_show[len_show].real(atan2_approx(est_pilot.imag(), est_pilot.real()));
-//        est_show[len_show].imag(sqrt(norm(cell)) / amp_pilot);
-//        ++len_show;
-//        // ...
-//        break;
-//    case TRPAPR_CARRIER:
-//        //TODO
-//        //printf("TRPAPR_CARRIER\n");
-//        break;
-//    default:
-//        break;
-//    }
+    //
+    cell = ofdm_cell[half_total];
+    pilot_refer = pilot_refer_idx_data_symbol[half_total];
+    switch (map[half_total]){
+    case DATA_CARRIER:
+        buffer_cell[idx_data] = cell;
+        ++idx_data;
+        break;
+    case CONTINUAL_CARRIER:
+        amp_pilot = amp_cp;
+       [[clang::fallthrough]];//_to suppress compiler warnings:
+        //            break;
+    case CONTINUAL_CARRIER_INVERTED:
+        amp_pilot = amp_cp;
+       [[clang::fallthrough]];//_to suppress compiler warnings:
+        //            break;
+    case SCATTERED_CARRIER_INVERTED:
+    case SCATTERED_CARRIER:
+        est_dif = cell * conj(old_cell);
+        est_pilot = cell * pilot_refer;
+        amp_pilot = amp_sp;
+        //Only for show
+        est_show[len_show].real(atan2_approx(est_pilot.imag(), est_pilot.real()));
+        est_show[len_show].imag(sqrt(norm(cell)) / amp_pilot);
+        ++len_show;
+        // ...
+        break;
+    case TRPAPR_CARRIER:
+        //TODO
+        //printf("TRPAPR_CARRIER\n");
+        break;
+    default:
+        break;
+    }
 
-    int c = half_total/* + 1*/;
+    int c = half_total + 1;
     for (int i = c; i < k_total; ++i){
         cell = ofdm_cell[i];
         pilot_refer = pilot_refer_idx_data_symbol[i];
