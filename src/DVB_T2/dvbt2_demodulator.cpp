@@ -14,7 +14,6 @@
 */
 #include "dvbt2_demodulator.h"
 
-#include <QApplication>
 #include <immintrin.h>
 
 #include "DSP/fast_math.h"
@@ -52,9 +51,8 @@ dvbt2_demodulator::dvbt2_demodulator(id_device_t _id_device, float _sample_rate,
     // max parameters
     unsigned int max_len_symbol = FFT_32K + FFT_32K / 4 + P1_LEN;
     resample =  sample_rate / (SAMPLE_RATE * upsample);
-    max_resample = resample + resample * 1.0e-4;// for 100ppm
-    min_resample = resample - resample * 1.0e-4;// for 100ppm
-    uint len_max = (max_len_symbol + P1_LEN) * max_resample * upsample;
+    max_sample_rate_deviation = resample * 1.0e-4;// for 100ppm
+    uint len_max = (max_len_symbol + P1_LEN) * (resample + max_sample_rate_deviation) * upsample;
 
     decimator = new filter_decimator;
     out_interpolator = static_cast<complex*>(_mm_malloc(sizeof(complex) * len_max * upsample, 32));
@@ -163,8 +161,6 @@ void dvbt2_demodulator::execute(int _len_in, int16_t* _i_in, int16_t* _q_in, sig
         }
 
         arbitrary_resample = resample - sample_rate_est_filtered;
-        if(arbitrary_resample > max_resample) arbitrary_resample = max_resample;
-        if(arbitrary_resample < -min_resample) arbitrary_resample = -min_resample;
 
         chunk = static_cast<int>(std::nearbyint(est_chunk * arbitrary_resample * upsample));
         remain = len_in - idx_in;
@@ -206,8 +202,10 @@ void dvbt2_demodulator::execute(int _len_in, int16_t* _i_in, int16_t* _q_in, sig
             while(offset_nco < -M_PI_X_2) {
                 offset_nco += M_PI_X_2;
             }
-            nco_real = cos_lut(offset_nco);
-            nco_imag = sin_lut(offset_nco);
+//            nco_real = cos_lut(offset_nco);
+//            nco_imag = sin_lut(offset_nco);
+            nco_real = cosf(offset_nco);
+            nco_imag = sinf(offset_nco);
             out_derotate_sample[i].real(real * nco_real - imag * nco_imag);
             out_derotate_sample[i].imag(imag * nco_real + real * nco_imag);
             //_____________________________
@@ -279,7 +277,7 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
         if(next_symbol_type == SYMBOL_TYPE_P1) {
 
             bool p1_decoded = false;
-            if(p1_demodulator->execute(level_detect, len_in, in, consume,
+            if(p1_demodulator->execute(level_detect, len_in, in, consume, symbol_synchronize,
                                        buffer_sym, idx_buffer_sym, dvbt2, signal_->coarse_freq_offset,
                                        p1_decoded, signal_->p1_reset)) {
                 if(p2_init){
@@ -384,9 +382,10 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
         else if(next_symbol_type == SYMBOL_TYPE_P2) {
             idx_symbol = 0;
             bool crc32_l1_post = false;
+            symbol_synchronize = true;
             complex* deinterleaved_cell = p2_demodulator->execute(dvbt2, demodulator_init, idx_symbol, ofdm_cell,
-                                                            l1_pre, l1_post, crc32_l1_pre, crc32_l1_post,
-                                                            sample_rate_est, phase_est);
+                                                                  l1_pre, l1_post, crc32_l1_pre, crc32_l1_post,
+                                                                  sample_rate_est, phase_est, symbol_synchronize);
             if(crc32_l1_pre) {
                 if(demodulator_init) {
                     if(crc32_l1_post) {
@@ -446,18 +445,19 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
         }
 
         phase_est_filtered = loop_filter_phase_offset(phase_est * 1.0f, M_PIf32 * 2);
-//        double step = 5.0e-9;
+//        double step = -8.5e-10;
 //        if(old_sample_rate_est - sample_rate_est > 0.0f) {
 //            sample_rate_est_filtered -= step;
-//            if(resample - sample_rate_est_filtered < min_resample) sample_rate_est_filtered += step / 2.0;
+//            if(resample - sample_rate_est_filtered < min_resample) sample_rate_est_filtered += step;
 //        }
 //        else if(old_sample_rate_est - sample_rate_est < 0.0f){
 //            sample_rate_est_filtered += step;
-//            if(resample - sample_rate_est_filtered > max_resample) sample_rate_est_filtered -= step / 2.0;
+//            if(resample - sample_rate_est_filtered > max_resample) sample_rate_est_filtered -= step;
 //        }
 //        old_sample_rate_est = sample_rate_est;
-
-        sample_rate_est_filtered = loop_filter_sample_rate_offset(sample_rate_est, 5.0e-5);
+        if(symbol_synchronize){
+            sample_rate_est_filtered = loop_filter_sample_rate_offset(sample_rate_est, max_sample_rate_deviation);
+        }
 
         float sample_rate_offset_hz = (sample_rate_est_filtered *(float) SAMPLE_RATE) / M_PI_X_2;
         float frequency_offset_hz = (frequency_est_filtered * (float)SAMPLE_RATE) / M_PI_X_2;

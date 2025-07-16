@@ -41,7 +41,7 @@ public:
                                    address_freq_deinterleaver* _address);
     complex *execute(dvbt2_parameters &_dvbt2, bool _demod_init, int &_idx_symbol, complex* _ofdm_cell,
                      l1_presignalling &_l1_pre, l1_postsignalling &_l1_post, bool &_crc32_l1_pre,
-                     bool &_crc32_l1_post, float &_sample_rate_offset, float &_phase_offset);
+                     bool &_crc32_l1_post, float &_sample_rate_offset, float &_phase_offset, bool &_symbol_synchronize);
 
     enum id_show{
         p2_l1_pre = 0,

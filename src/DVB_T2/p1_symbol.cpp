@@ -72,8 +72,7 @@ void p1_symbol::init_p1_randomize()
  *     |____| delay Tb |____*_/ x \__| run average Tb   |------------------------------> arg max - time estimate
  *          |__________|      \___/  |__________________|
  */
-bool p1_symbol::execute(float _level_detect,
-                        const int _len_in, complex *_in, int &_consume,
+bool p1_symbol::execute(float _level_detect, const int _len_in, complex *_in, int &_consume, const bool _symbol_synchronize,
                         complex* _buffer_sym, int &_idx_buffer_sym,
                         dvbt2_parameters &_dvbt2, double &_coarse_freq_offset,
                         bool &_p1_decoded, bool &_reset)
@@ -92,6 +91,7 @@ bool p1_symbol::execute(float _level_detect,
 
         complex data = in[idx_in++];
         p1_buffer.write(data);
+        ++consume_p1;
 
         data_sihft = data * fq_shift[idx_fq_shift++];
         idx_fq_shift &= 0x3FF;
@@ -129,8 +129,14 @@ bool p1_symbol::execute(float _level_detect,
 
                 complex *buff = p1_buffer.read();
 
-                memcpy(buffer_sym, &buff[P1_LEN - idx_buffer], sizeof(complex) * idx_buffer);
+                if(_symbol_synchronize){
+                    int idx_synchronize = consume_p1 - P1_LEN;
+                    if(idx_synchronize > 0 && idx_synchronize < P1_B_PART){
+                        idx_buffer = idx_synchronize;
+                    }
+                }
                 _idx_buffer_sym = idx_buffer;
+                memcpy(buffer_sym, &buff[P1_LEN - idx_buffer], sizeof(complex) * idx_buffer);
                 memcpy(in_fft, &buff[P1_C_PART - idx_buffer], sizeof(complex) * static_cast<unsigned int>(P1_A_PART));
 
                 p1_buffer.reset();
@@ -138,7 +144,7 @@ bool p1_symbol::execute(float _level_detect,
                 p1_fft = fft->execute();
                 double coarse_freq_offset = atan2_approx(arg_max.imag(), arg_max.real()) * (double)P1_HERTZ_PER_RADIAN;
                 if(!p1_decoded || _reset) {
-                    for(int shift = 76; shift < 96; ++shift) { // +- 90kHz (one shift +- 8928,5Hz)
+                    for(int shift = 80; shift < 92; ++shift) { // +- 90kHz (one shift +- 8928,5Hz)
                         complex* p1= p1_fft + shift;
                         if(demodulate(p1, _dvbt2)) {
                             p1_decoded = true;
@@ -171,6 +177,8 @@ bool p1_symbol::execute(float _level_detect,
             ++idx_buffer;
 
         }
+
+
 
     }
 
@@ -310,6 +318,7 @@ void p1_symbol::reset_buffer()
     average_b.reset();
     average_c.reset();
     idx_buffer = 0;
+    consume_p1 = 0;
 }
 //-------------------------------------------------------------------------------------------
 

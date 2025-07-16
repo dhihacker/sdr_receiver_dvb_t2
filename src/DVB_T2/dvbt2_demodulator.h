@@ -110,7 +110,7 @@ private:
     float frequency_nco = 0.0f;
     float frequency_est_filtered = 0.0f;
     constexpr static float frequency_damping_ratio = 0.7f;//0.7f
-    constexpr static int frequency_bw_hz = 10000;
+    constexpr static int frequency_bw_hz = 2000000;
     proportional_integral_loop_filter<float, float, frequency_damping_ratio, frequency_bw_hz,
                                       samplerate_hz> loop_filter_frequency_offset;
 
@@ -118,7 +118,7 @@ private:
     float old_sample_rate_est = 0.0f;
 
     constexpr static float sample_rate_damping_ratio = 0.7f;//0.7f
-    constexpr static int sample_rate_bw_hz = 1000;
+    constexpr static int sample_rate_bw_hz = 100;
     proportional_integral_loop_filter<float, float, sample_rate_damping_ratio, sample_rate_bw_hz,
                                       samplerate_hz> loop_filter_sample_rate_offset;
 
@@ -126,8 +126,7 @@ private:
     constexpr static uint upsample = DECIMATION_STEP;
     float sample_rate;
     double resample;
-    double max_resample;
-    double min_resample;
+    double max_sample_rate_deviation;
 
     complex* out_interpolator;
     complex* out_decimator;
@@ -139,6 +138,7 @@ private:
     void reset();
     void init_dvbt2();
 
+    bool symbol_synchronize = false;
     int symbol_size = P1_LEN;
     int idx_buffer_sym = 0;
     complex* buffer_sym = nullptr;

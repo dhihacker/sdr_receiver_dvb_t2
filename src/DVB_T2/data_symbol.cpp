@@ -160,7 +160,7 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
     sum_pilot_1 += est_pilot;
 //    sum_dif_1 += est_dif;
     angle_est = atan2_approx(est_pilot.imag(), est_pilot.real());
-    amp_est = sqrt(norm(cell)) / amp_pilot;
+    amp_est = sqrtf(norm(cell)) / amp_pilot;
     //__ ... ______________
 
     for (int i = 1; i < half_total; ++i){
@@ -186,7 +186,8 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
             est_pilot = cell * pilot_refer;
             sum_pilot_1 += est_pilot;
 //            sum_dif_1 += est_dif;
-            angle = atan2_approx(est_pilot.imag(), est_pilot.real());
+//            angle = atan2_approx(est_pilot.imag(), est_pilot.real());
+            angle = atan2f(est_pilot.imag(), est_pilot.real());
 
             dif_angle = angle - angle_est;
             if(dif_angle > M_PIf32) dif_angle = M_PIf32 * 2.0f - dif_angle;
@@ -195,14 +196,16 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
             sum_dif_1 += dif_angle;
 
             delta_angle = (dif_angle) / (idx_data + 1);
-            amp = sqrt(norm(cell)) / amp_pilot;
+            amp = sqrtf(norm(cell)) / amp_pilot;
             amp_pilot = amp_sp;
             delta_amp = (amp - amp_est) / (idx_data + 1);
             for(int j = 0; j < idx_data; ++j){
                 angle_est += delta_angle;
                 amp_est += delta_amp;
-                derotate.real(cos_lut(angle_est) / amp_est);
-                derotate.imag(sin_lut(angle_est) / amp_est);
+//                derotate.real(cos_lut(angle_est) / amp_est);
+//                derotate.imag(sin_lut(angle_est) / amp_est);
+                derotate.real(cosf(angle_est) / amp_est);
+                derotate.imag(sinf(angle_est) / amp_est);
                 deinterleaved_cell[h[d]] = buffer_cell[j] * conj(derotate);
                 ++d;
             }
@@ -246,7 +249,7 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
         amp_pilot = amp_sp;
         //Only for show
         est_show[len_show].real(atan2_approx(est_pilot.imag(), est_pilot.real()));
-        est_show[len_show].imag(sqrt(norm(cell)) / amp_pilot);
+        est_show[len_show].imag(sqrtf(norm(cell)) / amp_pilot);
         ++len_show;
         // ...
         break;
@@ -282,7 +285,8 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
             est_pilot = cell * pilot_refer;
             sum_pilot_2 += est_pilot;
 //            sum_dif_2 += est_dif;
-            angle = atan2_approx(est_pilot.imag(), est_pilot.real());
+//            angle = atan2_approx(est_pilot.imag(), est_pilot.real());
+            angle = atan2f(est_pilot.imag(), est_pilot.real());
 
             dif_angle = angle - angle_est;
             if(dif_angle > M_PIf32) dif_angle = M_PIf32 * 2.0f - dif_angle;
@@ -291,14 +295,16 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
             sum_dif_2 += dif_angle;
 
             delta_angle = (dif_angle) / (idx_data + 1);
-            amp = sqrt(norm(cell)) / amp_pilot;
+            amp = sqrtf(norm(cell)) / amp_pilot;
             amp_pilot = amp_sp;
             delta_amp = (amp - amp_est) / (idx_data + 1);
             for(int j = 0; j < idx_data; ++j){
                 angle_est += delta_angle;
                 amp_est += delta_amp;
-                derotate.real(cos_lut(angle_est) / amp_est);
-                derotate.imag(sin_lut(angle_est) / amp_est);
+//                derotate.real(cos_lut(angle_est) / amp_est);
+//                derotate.imag(sin_lut(angle_est) / amp_est);
+                derotate.real(cosf(angle_est) / amp_est);
+                derotate.imag(sinf(angle_est) / amp_est);
                 deinterleaved_cell[h[d]] = buffer_cell[j] * conj(derotate);
                 ++d;
             }
@@ -320,13 +326,13 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
         }
     }
 
-    float ph_1 = atan2_approx(sum_pilot_1.imag(), sum_pilot_1.real());
-    float ph_2 = atan2_approx(sum_pilot_2.imag(), sum_pilot_2.real());
+    float ph_1 = atan2f(sum_pilot_1.imag(), sum_pilot_1.real());
+    float ph_2 = atan2f(sum_pilot_2.imag(), sum_pilot_2.real());
 
     _phase_offset = (ph_2 + ph_1);
 
-//        _sample_rate_offset = (sum_angle_2 - sum_angle_1)/* / k_total*/;
-        _sample_rate_offset = (sum_dif_2 - sum_dif_1) / k_total;
+        _sample_rate_offset = (sum_angle_2 - sum_angle_1) / k_total;
+//        _sample_rate_offset = (sum_dif_2 - sum_dif_1) / k_total;
 
     if(idx_symbol == n_p2) {
         int len = c_data;

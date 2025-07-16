@@ -37,8 +37,7 @@ public:
     explicit p1_symbol(QObject *parent = nullptr);
     ~p1_symbol() override;
 
-    bool execute(float _level_detect,
-                 const int _len_in, complex *_in, int &_consume,
+    bool execute(float _level_detect, const int _len_in, complex *_in, int &_consume, bool _symbol_synchronize,
                  complex* _buffer_sym, int &_idx_buffer_sym,
                  dvbt2_parameters &_dvbt2, double &_coarse_freq_offset,
                  bool &_p1_decoded, bool &_reset);
@@ -59,6 +58,7 @@ private:
     save_buffer<complex, P1_LEN>            p1_buffer;
     save_buffer<complex, P1_A_PART>         cor_buffer;
 
+    int consume_p1;
     int idx_buffer = 0;
     float correlation = 0;
     float max_correlation = 0.0;
