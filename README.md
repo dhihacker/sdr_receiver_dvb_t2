@@ -19,6 +19,7 @@ Received DVB-T2 signal parameters:
 1. SISO and one RT-TX
 2. 8MHz 16K or 32K only (32K tested)
 3. Output Transport Stream(TS) (HEM mode tested)
+
 Not supported:
 1. FEF part
 2. T2-Lite
