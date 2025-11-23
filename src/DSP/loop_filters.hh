@@ -16,6 +16,8 @@
 #define LOOP_FILTERS_HH
 
 #include <cstdio>
+#include <vector>
+#include <cmath>
 
 template<typename T, typename F , const F &damping_ratio_, int bw_hz_, int samplerate_hz_>
 class proportional_integral_loop_filter
@@ -42,8 +44,14 @@ public:
     {
         integral_error = old_integral_error + k_i * _in_error;
         out_error = integral_error + k_p * _in_error;
-        if(integral_error > max_integral_) integral_error = max_integral_;
-        else if(integral_error < -max_integral_) integral_error = -max_integral_;
+        if(integral_error > max_integral_) {
+            integral_error = max_integral_;
+            out_error = integral_error;
+        }
+        else if(integral_error < -max_integral_) {
+            integral_error = -max_integral_;
+            out_error = integral_error;
+        }
         old_integral_error = integral_error;
         return out_error;
     }
@@ -69,6 +77,27 @@ public:
     void reset()
     {
         out = 0;
+    }
+};
+
+template<typename T>
+class hann_window
+{
+private:
+    int len = 0;
+
+public:
+    hann_window() {};
+    void set_hann_window(int _len, std::vector<T> &_h_window)
+    {
+        if(len != _len){
+            len = _len;
+            _h_window.resize(len);
+            for (int i = 0; i < len; ++i){
+                T w = 0.5 - 0.5 * cos(2.0 * M_PI * (double)i / (double)_len);
+                _h_window.push_back(w);
+            }
+        }
     }
 };
 
