@@ -186,7 +186,7 @@ void usb_plutosdr::thread_func(uint32_t curr_enabled_channels, uint32_t curr_buf
 
     // calculate buffer size in bytes
     uint32_t sample_size_bytes = /*curr_enabled_channels * */sizeof(uint16_t);
-    curr_buffer_size_bytes = curr_buffer_size_samples * sample_size_bytes;
+    curr_buffer_size_bytes = curr_buffer_size_samples * sample_size_bytes * 2;
 
     // allocate buffer
     std::shared_ptr<std::vector<uint8_t>> buffer = std::make_shared<std::vector<uint8_t>>();

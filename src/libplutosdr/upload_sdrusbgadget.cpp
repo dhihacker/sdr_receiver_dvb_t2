@@ -3,9 +3,13 @@
 #include <QFile>
 #include <chrono>
 #include <thread>
-#include <Winsock2.h>
 
+#ifdef WIN32
+#include <Winsock2.h>
 #include "libssh.h"
+#else
+#include <libssh/libssh.h>
+#endif
 
 #include <QDebug>
 
@@ -160,7 +164,10 @@ void upload_sdrusbgadget::upload(std::string ip)
     rc = ssh_scp_push_file(scp, "sdr_usb_gadget", size_file, S_IRWXU);
     if (rc != SSH_OK) {
         file_blob.close();
-        fprintf(stderr, "Can't open remote file: %s\n", ssh_get_error(session));
+        std::string err = ssh_get_error(session);
+        size_t pos = err.find("Text file busy");
+        if(pos != std::string::npos) return;
+        fprintf(stderr, "Can't push file sdr_usb_gadget: %s\n", err.c_str());
         exit(-1);
     }
     buffer = (char*)malloc(size_file);
