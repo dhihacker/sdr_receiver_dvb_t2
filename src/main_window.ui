@@ -253,6 +253,23 @@
              </property>
             </spacer>
            </item>
+           <item row="6" column="0">
+            <widget class="QLabel" name="label_11">
+             <property name="text">
+              <string>ip address :</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="2">
+            <widget class="QLineEdit" name="line_edit_ip">
+             <property name="inputMethodHints">
+              <set>Qt::ImhNone</set>
+             </property>
+             <property name="inputMask">
+              <string/>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
@@ -947,6 +964,8 @@
      <addaction name="action_sdrplay"/>
      <addaction name="action_airspy"/>
      <addaction name="action_plutosdr"/>
+     <addaction name="action_hackrf_one"/>
+     <addaction name="action_usrp"/>
     </widget>
     <addaction name="menu_open"/>
     <addaction name="action_exit"/>
@@ -975,6 +994,16 @@
    </property>
    <property name="text">
     <string>PlutoSDR</string>
+   </property>
+  </action>
+  <action name="action_hackrf_one">
+   <property name="text">
+    <string>HackRF One</string>
+   </property>
+  </action>
+  <action name="action_usrp">
+   <property name="text">
+    <string>USRP</string>
    </property>
   </action>
  </widget>

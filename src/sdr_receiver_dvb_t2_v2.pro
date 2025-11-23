@@ -82,8 +82,10 @@ SOURCES += \
     plot.cpp \
     qcustomplot.cpp \
     rx_airspy.cpp \
+    rx_hackrf_one.cpp \
     rx_plutosdr_daemon.cpp \
-    rx_sdrplay.cpp
+    rx_sdrplay.cpp \
+    rx_usrp.cpp
 
 HEADERS += \
     DSP/buffers.hh \
@@ -124,12 +126,14 @@ HEADERS += \
     libplutosdr/upload_sdrusbgadget.h \
     libplutosdr/usb_plutosdr.h \
     list_device/scan_usb_device.h \
+    rx_hackrf_one.h \
     rx_plutosdr_daemon.h \
     rx_sdrplay.h\
     main_window.h \
     plot.h \
     qcustomplot.h \
-    rx_airspy.h
+    rx_airspy.h \
+    rx_usrp.h
 
 FORMS += \
     main_window.ui
@@ -138,7 +142,10 @@ unix:{
 LIBS += -liio
 LIBS += -lfftw3f
 LIBS += -lmirsdrapi-rsp
+LIBS += -lhackrf
+LIBS += -luhd
 LIBS += -lusb-1.0
+LIBS += -lssh
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
@@ -166,10 +173,10 @@ LIBS += -L$$PWD/libplutosdr/lib_iio/Windows-VS-2019-x64/ -llibiio
 INCLUDEPATH += $$PWD/libplutosdr/lib_iio/include
 DEPENDPATH += $$PWD/libplutosdr/lib_iio/include
 
-LIBS += -L$$PWD/libpthreads/ -lpthreadVC3
-INCLUDEPATH += $$PWD/libpthreads
-DEPENDPATH += $$PWD/libpthreads
-PRE_TARGETDEPS += $$PWD/libpthreads/pthreadVC3.lib
+# LIBS += -L$$PWD/libpthreads/ -lpthreadVC3
+# INCLUDEPATH += $$PWD/libpthreads
+# DEPENDPATH += $$PWD/libpthreads
+# PRE_TARGETDEPS += $$PWD/libpthreads/pthreadVC3.lib
 
 LIBS += -L$$PWD/libplutosdr/libssh/ -lssh
 INCLUDEPATH += $$PWD/libplutosdr/libssh/include

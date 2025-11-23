@@ -14,10 +14,6 @@
 */
 #include "rx_sdrplay.h"
 
-#include <QThread>
-#include <QWaitCondition>
-#include <QMutex>
-
 //-------------------------------------------------------------------------------------------
 rx_sdrplay::rx_sdrplay(QObject *parent) : QObject(parent)
 {  

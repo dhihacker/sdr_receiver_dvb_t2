@@ -63,6 +63,8 @@ int rx_plutosdr_daemon::init(uint32_t _rf_frequence_hz, int _gain)
     altvoltage0 = iio_device_find_channel(ad9361_phy, "altvoltage0", true);
     err = iio_channel_attr_write_longlong(altvoltage0, "frequency", rf_frequency);
 
+    iio_channel_attr_write_longlong(iio_device_find_channel(ad9361_phy, "altvoltage1", true), "powerdown", 1);
+
     if(err !=0) return err;
 
     voltage0 = iio_device_find_channel(ad9361_phy, "voltage0", false);
@@ -217,7 +219,7 @@ void rx_plutosdr_daemon::set_gain()
     if(agc && signal->change_gain) {
         signal->change_gain = false;
         gain_db += signal->gain_offset;
-        if(gain_db == 71) {
+        if(gain_db > 73) {
             gain_db = 0;
         }
         int err = iio_channel_attr_write_double(voltage0, "hardwaregain", gain_db);
@@ -241,6 +243,8 @@ int rx_plutosdr_daemon::rx_callback(usb_plutosdr_transfer* transfer)
 //-----------------------------------------------------------------------------------------------
 void rx_plutosdr_daemon::work(uint32_t len_out_device, int16_t* p_dat)
 {
+
+//    qDebug() << len_out_device;
 
     for(uint i = 0; i < len_out_device; ++i) {
         ptr_i_buffer[i] = p_dat[0];
@@ -304,9 +308,10 @@ void rx_plutosdr_daemon::work(uint32_t len_out_device, int16_t* p_dat)
 //-----------------------------------------------------------------------------------------------
 void rx_plutosdr_daemon::stop()
 {
-    emit stop_demodulator();
+    usb_direct->stop();
     if(thread->isRunning()) thread->wait(1000);
     shutdown();
+    emit stop_demodulator();
     delete [] i_buffer_a;
     delete [] q_buffer_a;
     delete [] i_buffer_b;

@@ -20,10 +20,9 @@
 #include "list_device/scan_usb_device.h"
 #include "rx_sdrplay.h"
 #include "rx_airspy.h"
-// #ifndef WIN32
-//#include "rx_plutosdr.h"
+#include "rx_hackrf_one.h"
+#include "rx_usrp.h"
 #include "rx_plutosdr_daemon.h"
-// #endif
 #include "plot.h"
 #include "DVB_T2/dvbt2_demodulator.h"
 
@@ -57,10 +56,12 @@ private slots:
 
     void open_airspy();
     void status_airspy(int _err);
-// #ifndef WIN32
     void open_plutosdr();
     void status_plutosdr(int _err);
-// #endif
+    void open_hackrf_one();
+    void status_hackrf_one(int _err);
+    void open_usrp();
+    void status_usrp(int _err);
     void radio_frequency(double _rf);
     void level_gain(int _gain);
     void bad_signal();
@@ -94,13 +95,14 @@ private:
     QThread* thread = nullptr;
     rx_sdrplay* ptr_sdrplay;
     rx_airspy* ptr_airspy;
+    rx_hackrf_one* ptr_hackrf_one;
+    rx_usrp* ptr_usrp;
     int start_sdrplay();
     int start_airspy();
-// #ifndef WIN32
-//    rx_plutosdr* ptr_plutosdr;
+    int start_hackrf_one();
+    int start_usrp();
     rx_plutosdr_daemon* ptr_plutosdr;
     int start_plutosdr();
-// #endif
     void connect_info();
     void disconnect_info();
     QButtonGroup* button_group_p2_symbol;

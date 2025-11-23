@@ -25,7 +25,7 @@ main_window::main_window(QWidget *parent)
     sd = new scan_usb_device;
     connect(sd, &scan_usb_device::found, this, &main_window::device_found);
     timer_sd = new QTimer;
-    connect(timer_sd, &QTimer::timeout, sd, &scan_usb_device::scan);
+    connect(timer_sd, &QTimer::timeout, sd, &scan_usb_device:: scan);
     timer_sd->start(1000);
 
     connect(ui->action_plutosdr, SIGNAL(triggered()), this, SLOT(open_plutosdr()));
@@ -37,6 +37,12 @@ main_window::main_window(QWidget *parent)
     connect(ui->action_sdrplay, SIGNAL(triggered()), this, SLOT(open_sdrplay()));
     ui->action_sdrplay->setVisible(false);
     ui->action_sdrplay->setEnabled(false);
+    connect(ui->action_hackrf_one, SIGNAL(triggered()), this, SLOT(open_hackrf_one()));
+    ui->action_hackrf_one->setVisible(false);
+    ui->action_hackrf_one->setEnabled(false);
+    connect(ui->action_usrp, SIGNAL(triggered()), this, SLOT(open_usrp()));
+    ui->action_usrp->setVisible(false);
+    ui->action_usrp->setEnabled(false);
 
     connect(ui->action_exit, SIGNAL(triggered()), this, SLOT(close()));
 
@@ -46,7 +52,7 @@ main_window::main_window(QWidget *parent)
     ui->push_button_stop->setEnabled(false);
     ui->push_button_ts_open_file->setEnabled(false);
     ui->push_button_ts_apply->setEnabled(false);
-    ui->lineEdit_ip->setInputMask("000.000.000.000");
+    ui->line_edit_ip->setInputMask("000.000.000.000");
 
     p1_spectrograph = new plot(ui->widget_fft_plot_p1, type_spectrograph, "Fast Fourier transform spectrum");
     p1_constelation = new plot(ui->widget_constellation_plot_p1, type_constelation, "Constellation diagram");
@@ -102,6 +108,16 @@ void main_window::device_found(ushort id_vendor, ushort id_product)
         ui->action_sdrplay->setVisible(true);
         ui->action_sdrplay->setEnabled(true);
         qDebug() << "SDRPlay";
+    }
+    else if(id_vendor == 0x1d50 &&  id_product == 0x6089){
+        ui->action_hackrf_one->setVisible(true);
+        ui->action_hackrf_one->setEnabled(true);
+        qDebug() << "HackRF One";
+    }
+    else if(id_vendor == 0x2500 &&  id_product == 0x0020){
+        ui->action_usrp->setVisible(true);
+        ui->action_usrp->setEnabled(true);
+        qDebug() << "USRP";
     }
 }
 //------------------------------------------------------------------------------------------------
@@ -251,9 +267,9 @@ void main_window::open_plutosdr()
    int err;
 
    QString qip = "192.168.002.001";
-   ui->lineEdit_ip->setText(qip);
+   ui->line_edit_ip->setText(qip);
 
-   std::string ip = ui->lineEdit_ip->text().toStdString();
+   std::string ip = ui->line_edit_ip->text().toStdString();
    std::string ser_no;
    std::string hw_ver;
    ptr_plutosdr = new rx_plutosdr_daemon;
@@ -311,6 +327,127 @@ void main_window::status_plutosdr(int _err)
 }
 // #endif
 //------------------------------------------------------------------------------------------------
+void main_window::open_hackrf_one()
+{
+    timer_sd->stop();
+    int err;
+    std::string ser_no;
+    std::string hw_ver;
+
+    ptr_hackrf_one = new rx_hackrf_one;
+    err = ptr_hackrf_one->get(ser_no, hw_ver);
+
+    ui->text_log->insertPlainText("Get HackRF One :" +
+                                  QString::fromStdString(ptr_hackrf_one->error(err)) + "\n");
+    if(err < 0) return;
+
+    ui->label_name->setText("Name : HackRF One");
+    ui->label_ser_no->setText("Serial No : " + QString::fromStdString(ser_no));
+    ui->label_hw_ver->setText("HW: " + QString::fromStdString(hw_ver));
+    ui->label_gain->setText("gain (0-73):");
+
+    id_device = id_hackrf;
+    ui->action_hackrf_one->setEnabled(false);
+    ui->push_button_start->setEnabled(true);
+
+}
+//------------------------------------------------------------------------------------------------
+int main_window::start_hackrf_one()
+{
+    uint64_t rf_fraquency_hz;
+    int gain;
+    int err;
+    rf_fraquency_hz = static_cast<uint64_t>(ui->line_edit_rf->text().toULong());
+    gain = static_cast<uint8_t>(ui->line_edit_gain->text().toUInt());
+    if(ui->check_box_agc->isChecked()) gain = -1;
+    err = ptr_hackrf_one->init(rf_fraquency_hz, gain);
+    ui->text_log->insertPlainText("Init HackRF One:"  " "  +
+                                  QString::fromStdString(ptr_hackrf_one->error(err)) + "\n");
+    if(err !=0) return err;
+
+    thread = new QThread;
+    ptr_hackrf_one->moveToThread(thread);
+    connect(thread, SIGNAL(started()), ptr_hackrf_one, SLOT(start()));
+    connect(this,SIGNAL(stop_device()),ptr_hackrf_one,SLOT(stop()),Qt::DirectConnection);
+    connect(ptr_hackrf_one, SIGNAL(finished()), ptr_hackrf_one, SLOT(deleteLater()));
+    connect(ptr_hackrf_one, SIGNAL(finished()), thread, SLOT(quit()),Qt::DirectConnection);
+    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+    connect(thread, SIGNAL(finished()), this, SLOT(finished_hackrf()));
+    thread->start(QThread::TimeCriticalPriority);
+
+    connect(ptr_hackrf_one, &rx_hackrf_one::status, this, &main_window::status_hackrf_one);
+    connect(ptr_hackrf_one, &rx_hackrf_one::radio_frequency, this, &main_window::radio_frequency);
+    connect(ptr_hackrf_one, &rx_hackrf_one::level_gain, this, &main_window::level_gain);
+
+    return 0;
+}
+//------------------------------------------------------------------------------------------------
+void main_window::status_hackrf_one(int _err)
+{
+    ui->text_log->insertPlainText("Status HackRF One:"  " "  +
+                                  QString::fromStdString(ptr_hackrf_one->error(_err)) + "\n");
+}
+//------------------------------------------------------------------------------------------------
+void main_window::open_usrp()
+{
+    timer_sd->stop();
+    int err;
+    std::string ser_no;
+    std::string hw_ver;
+
+    ptr_usrp = new rx_usrp;
+    err = ptr_usrp->get(ser_no, hw_ver);
+
+    ui->text_log->insertPlainText("Get USRP :" +
+                                  QString::fromStdString(ptr_usrp->error(err)) + "\n");
+    if(err < 0) return;
+
+    ui->label_name->setText("Name : USRP");
+    ui->label_ser_no->setText("Serial No : " + QString::fromStdString(ser_no));
+    ui->label_hw_ver->setText("HW: " + QString::fromStdString(hw_ver));
+    ui->label_gain->setText("gain_db (0-73):");
+
+    id_device = id_usrp;
+    ui->action_usrp->setEnabled(false);
+    ui->push_button_start->setEnabled(true);
+
+}
+//------------------------------------------------------------------------------------------------
+int main_window::start_usrp()
+{
+    uint64_t rf_fraquency_hz;
+    int gain;
+    int err;
+    rf_fraquency_hz = static_cast<uint64_t>(ui->line_edit_rf->text().toULong());
+    gain = static_cast<uint8_t>(ui->line_edit_gain->text().toUInt());
+    if(ui->check_box_agc->isChecked()) gain = -1;
+    err = ptr_usrp->init(rf_fraquency_hz, gain);
+    ui->text_log->insertPlainText("Init USRP:"  " "  +
+                                  QString::fromStdString(ptr_usrp->error(err)) + "\n");
+    if(err !=0) return err;
+
+    thread = new QThread;
+    ptr_usrp->moveToThread(thread);
+    connect(thread, SIGNAL(started()), ptr_usrp, SLOT(start()));
+    connect(this,SIGNAL(stop_device()),ptr_usrp,SLOT(stop()),Qt::DirectConnection);
+    connect(ptr_usrp, SIGNAL(finished()), ptr_usrp, SLOT(deleteLater()));
+    connect(ptr_usrp, SIGNAL(finished()), thread, SLOT(quit()),Qt::DirectConnection);
+    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+    thread->start(QThread::TimeCriticalPriority);
+
+    connect(ptr_usrp, &rx_usrp::status, this, &main_window::status_usrp);
+    connect(ptr_usrp, &rx_usrp::radio_frequency, this, &main_window::radio_frequency);
+    connect(ptr_usrp, &rx_usrp::level_gain, this, &main_window::level_gain);
+
+    return 0;
+}
+//------------------------------------------------------------------------------------------------
+void main_window::status_usrp(int _err)
+{
+    ui->text_log->insertPlainText("Status USRP:"  " "  +
+                                  QString::fromStdString(ptr_usrp->error(_err)) + "\n");
+}
+//------------------------------------------------------------------------------------------------
 void main_window::on_push_button_start_clicked()
 {
     ui->menu_open->setEnabled(false);
@@ -327,20 +464,33 @@ void main_window::on_push_button_start_clicked()
 
         dvbt2 = ptr_airspy->demodulator;
         break;
-// #ifndef WIN32
+
+    case id_hackrf:
+        if(start_hackrf_one() != 0) return;
+
+        dvbt2 = ptr_hackrf_one->demodulator;
+        break;
+
+    case id_usrp:
+        if(start_usrp() != 0) return;
+
+        dvbt2 = ptr_usrp->demodulator;
+        break;
+
     case id_plutosdr:
 
         if(start_plutosdr() != 0) return;
 
         dvbt2 = ptr_plutosdr->demodulator;
         break;
-// #endif
+
     }
     for(int i = 1; i < ui->tab_widget->count(); ++i) ui->tab_widget->setTabEnabled(i, true);
     connect_info();
     ui->push_button_start->setEnabled(false);
     ui->line_edit_rf->setEnabled(false);
     ui->line_edit_gain->setEnabled(false);
+    ui->line_edit_ip->setEnabled(false);
     ui->check_box_agc->setEnabled(false);
     ui->push_button_stop->setEnabled(true);
 }
@@ -426,6 +576,12 @@ void main_window::level_gain(int _gain)
     case id_plutosdr:
         str_gain = "gain :   ";
         break;
+    case id_hackrf:
+        str_gain = "gain :   ";
+        break;
+    case id_usrp:
+        str_gain = "gain :   ";
+        break;
     }
     ui->label_info_gain->setText(str_gain + QString::number(_gain));
 }
@@ -470,10 +626,6 @@ void main_window::on_tab_widget_currentChanged(int index)
         disconnect_signals();
         connect(dvbt2->p1_demodulator, &p1_symbol::replace_oscilloscope,
                 p1_correlation_oscilloscope, &plot::replace_oscilloscope);
-
-//        connect(dvbt2->p2_demodulator, &p2_symbol::replace_oscilloscope,
-//                p2_equalizer_oscilloscope, &plot::replace_oscilloscope);
-
         connect(dvbt2->data_demodulator, &data_symbol::replace_oscilloscope,
                 p2_equalizer_oscilloscope, &plot::replace_oscilloscope);
 
