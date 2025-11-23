@@ -12,6 +12,8 @@ Supported devices:
 1. SdrPlay (need to install API/HW driver – V2.*(but not V3.*) from https://www.sdrplay.com) 
 2. AirSpy
 3. PlutoSDR
+4. HackRF One
+5. USRP B200 mini
 
 For windows and PlutoSDR(windows) need libusb-1.0 branch: https://github.com/Novakov/libusb/tree/winusb-lazy-create-file
 
