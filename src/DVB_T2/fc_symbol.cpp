@@ -185,33 +185,33 @@ complex* fc_symbol::execute(complex* _ofdm_cell, float &_sample_rate_offset, flo
         }
     }
 
-    cell = ofdm_cell[half_total];
-    pilot_refer = fc_pilot_refer[half_total];
-    switch (fc_carrier_map[half_total]){
-    case DATA_CARRIER:
-        buffer_cell[idx_data] = cell;
-        ++idx_data;
-        break;
-    case SCATTERED_CARRIER_INVERTED:
-    case SCATTERED_CARRIER:
-        est_dif = cell * conj(old_cell);
-        est_pilot = cell * pilot_refer;
-//        angle = atan2_approx(est_pilot.imag(), est_pilot.real());
-        angle = atan2f(est_pilot.imag(), est_pilot.real());
-        amp = sqrtf(norm(cell)) / amp_pilot;
-        //Only for show
-        est_show[len_show].real(angle);
-        est_show[len_show].imag(amp);
-        ++len_show;
-        // ...
-        break;
-    case TRPAPR_CARRIER:
-        //TODO
-        //printf("TRPAPR_CARRIER\n");
-        break;
-    default:
-        break;
-    }
+//    cell = ofdm_cell[half_total];
+//    pilot_refer = fc_pilot_refer[half_total];
+//    switch (fc_carrier_map[half_total]){
+//    case DATA_CARRIER:
+//        buffer_cell[idx_data] = cell;
+//        ++idx_data;
+//        break;
+//    case SCATTERED_CARRIER_INVERTED:
+//    case SCATTERED_CARRIER:
+//        est_dif = cell * conj(old_cell);
+//        est_pilot = cell * pilot_refer;
+////        angle = atan2_approx(est_pilot.imag(), est_pilot.real());
+//        angle = atan2f(est_pilot.imag(), est_pilot.real());
+//        amp = sqrtf(norm(cell)) / amp_pilot;
+//        //Only for show
+//        est_show[len_show].real(angle);
+//        est_show[len_show].imag(amp);
+//        ++len_show;
+//        // ...
+//        break;
+//    case TRPAPR_CARRIER:
+//        //TODO
+//        //printf("TRPAPR_CARRIER\n");
+//        break;
+//    default:
+//        break;
+//    }
 
     for (int i = half_total/* + 1*/; i < k_total; ++i){
         cell = ofdm_cell[i];

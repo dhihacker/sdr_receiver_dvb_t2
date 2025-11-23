@@ -84,7 +84,7 @@ bool p1_symbol::execute(float _level_detect, const int _len_in, complex *_in, in
     int len_in = _len_in;
     complex* in = _in;
     bool p1_detect = false;
-    const float begin_threshold = _level_detect * 2.5e+3f;
+    const float begin_threshold = _level_detect * 1.0e+4f;
     const float end_threshold = 0.5f * begin_threshold;
 
     while(idx_in < len_in) {

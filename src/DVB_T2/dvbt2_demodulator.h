@@ -37,6 +37,8 @@ enum id_device_t{
     id_sdrplay = 0,
     id_airspy,
     id_plutosdr,
+    id_hackrf,
+    id_usrp
 };
 
 struct signal_estimate{
@@ -90,7 +92,7 @@ private:
     int chunk = 0;
     int est_chunk = 0;
 
-    static constexpr float dc_ratio = 1.0e-6f;//1.0e-5f
+    static constexpr float dc_ratio = 1.0e-5f;//1.0e-5f
     exponential_averager<float, float, dc_ratio> exp_avg_dc_real;
     exponential_averager<float, float, dc_ratio> exp_avg_dc_imag;
 
@@ -103,14 +105,14 @@ private:
 
     float phase_nco = 0.0f;
     float phase_est_filtered = 0.0f;
-    constexpr static float phase_damping_ratio_ = 0.7f;
-    constexpr static int phase_bw_hz_ = 1000000;
+    constexpr static float phase_damping_ratio_ = 0.7f;//0.7f
+    constexpr static int phase_bw_hz_ = 1000000;//1000000
     proportional_integral_loop_filter<float, float, phase_damping_ratio_, phase_bw_hz_,
                                       samplerate_hz> loop_filter_phase_offset;
     float frequency_nco = 0.0f;
     float frequency_est_filtered = 0.0f;
     constexpr static float frequency_damping_ratio = 0.7f;//0.7f
-    constexpr static int frequency_bw_hz = 2000000;
+    constexpr static int frequency_bw_hz = 2000000;//2000000
     proportional_integral_loop_filter<float, float, frequency_damping_ratio, frequency_bw_hz,
                                       samplerate_hz> loop_filter_frequency_offset;
 
@@ -118,7 +120,7 @@ private:
     float old_sample_rate_est = 0.0f;
 
     constexpr static float sample_rate_damping_ratio = 0.7f;//0.7f
-    constexpr static int sample_rate_bw_hz = 100;
+    constexpr static int sample_rate_bw_hz = 100;//100
     proportional_integral_loop_filter<float, float, sample_rate_damping_ratio, sample_rate_bw_hz,
                                       samplerate_hz> loop_filter_sample_rate_offset;
 

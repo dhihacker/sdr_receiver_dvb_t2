@@ -43,7 +43,19 @@ dvbt2_demodulator::dvbt2_demodulator(id_device_t _id_device, float _sample_rate,
         break;
     case id_plutosdr:
         convert_input = 1;
-        short_to_float = 1.0f / (1 << 10);
+        short_to_float = 1.0f / (1 << 11);
+        level_max = 0.04f;
+        level_min = level_max - 0.02f;
+        break;
+    case id_hackrf:
+        convert_input = 2;
+        short_to_float = 1.0f / (1 << 8);
+        level_max = 0.04f;
+        level_min = level_max - 0.02f;
+        break;
+    case id_usrp:
+        convert_input = 2;
+        short_to_float = 1.0f / (1 << 15);
         level_max = 0.04f;
         level_min = level_max - 0.02f;
         break;
@@ -177,6 +189,7 @@ void dvbt2_demodulator::execute(int _len_in, int16_t* _i_in, int16_t* _q_in, sig
         int j = 0;
 
         for(int i = 0; i < chunk; ++i) {
+
             j = (i + idx_in) * convert_input;
             real = _i_in[j] * short_to_float;
             imag = _q_in[j] * short_to_float;
@@ -224,14 +237,11 @@ void dvbt2_demodulator::execute(int _len_in, int16_t* _i_in, int16_t* _q_in, sig
 
     }
     //___IQ imbalance estimations___
-    float avg_theta1 = theta1 / len_in;
-    float avg_theta2 = theta2 / len_in;
-    float avg_theta3 = theta3 / len_in;
-    c1 = avg_theta1 / avg_theta2;
-    float c_temp = avg_theta3 / avg_theta2;
+    c1 = theta1 / theta2;
+    float c_temp = theta3 / theta2;
     c2 = sqrtf(c_temp * c_temp - c1 * c1);
     //___level gain estimation___
-    level_detect = avg_theta2 * avg_theta3;
+    level_detect = (theta2 * theta3) / len_in / len_in;
     if(signal_->gain_changed) {
         if(level_detect < level_min) {
             signal_->gain_offset = 1;
@@ -277,7 +287,7 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
         if(next_symbol_type == SYMBOL_TYPE_P1) {
 
             bool p1_decoded = false;
-            if(p1_demodulator->execute(level_detect, len_in, in, consume, symbol_synchronize,
+            if(p1_demodulator->execute(level_min, len_in, in, consume, symbol_synchronize,
                                        buffer_sym, idx_buffer_sym, dvbt2, signal_->coarse_freq_offset,
                                        p1_decoded, signal_->p1_reset)) {
                 if(p2_init){
@@ -436,6 +446,7 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
                 else {
                     signal_->reset = true;
                     signal_->p1_reset = true;
+                    next_symbol_type = SYMBOL_TYPE_P1;
                     reset();
 
                     return;
