@@ -35,7 +35,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 #include "filters.h"
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-#include "libusb/libusb.h"
+#include "libusb.h"
 #else
 #include <libusb-1.0/libusb.h>
 #endif
