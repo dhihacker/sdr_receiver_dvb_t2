@@ -25,6 +25,7 @@ bch_decoder::bch_decoder(QObject *parent) : QObject(parent)
 
     deheader = new bb_de_header;
     thread = new QThread;
+    thread->setObjectName("bb_de_header");
     deheader->moveToThread(thread);
     connect(this, &bch_decoder::bit_descramble, deheader, &bb_de_header::execute, Qt::BlockingQueuedConnection);
     connect(this, &bch_decoder::stop_deheader, deheader, &bb_de_header::stop);

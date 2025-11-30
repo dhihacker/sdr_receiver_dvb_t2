@@ -120,6 +120,7 @@ ldpc_decoder::ldpc_decoder(QObject *parent) : QObject(parent)
 
     decoder = new bch_decoder;
     thread = new QThread;
+    thread->setObjectName("bch_decoder");
     decoder->moveToThread(thread);
     connect(this, &ldpc_decoder::bit_bch, decoder, &bch_decoder::execute, Qt::BlockingQueuedConnection);
     connect(this, &ldpc_decoder::stop_decoder, decoder, &bch_decoder::stop);
@@ -255,6 +256,9 @@ void ldpc_decoder::execute(int* _idx_plp_simd, l1_postsignalling _l1_post, int _
         return;
 
     }
+//    else if(count > 0){
+//        fprintf(stderr, "LDPC decoder count %d\n", count - TRIALS);
+//    }
 
     int8_t *s;
     for(int j = 0; j < SIZEOF_SIMD; ++j) {

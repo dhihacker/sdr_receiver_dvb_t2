@@ -19,47 +19,14 @@
 #include "DSP/fast_math.h"
 
 //-------------------------------------------------------------------------------------------
-dvbt2_demodulator::dvbt2_demodulator(id_device_t _id_device, float _sample_rate, QObject *parent) :
+dvbt2_demodulator::dvbt2_demodulator(float _level_min, float _sample_rate, QObject *parent) :
     QObject(parent),
-    id_device(_id_device),
-    sample_rate(_sample_rate)
+    sample_rate(_sample_rate),
+    level_min(_level_min)
 {
     table_sin_cos_instance.table_();
 
     mutex = new QMutex;
-
-    switch (id_device) {
-    case id_sdrplay:
-        convert_input = 1;
-        short_to_float = 1.0f / (1 << 14);
-        level_max = 0.04f;
-        level_min = level_max - 0.02f;
-        break;
-    case id_airspy:
-        convert_input = 2;
-        short_to_float = 1.0f / (1 << 12);
-        level_max = 0.04f;
-        level_min = level_max - 0.03f;
-        break;
-    case id_plutosdr:
-        convert_input = 1;
-        short_to_float = 1.0f / (1 << 11);
-        level_max = 0.04f;
-        level_min = level_max - 0.02f;
-        break;
-    case id_hackrf:
-        convert_input = 2;
-        short_to_float = 1.0f / (1 << 8);
-        level_max = 0.04f;
-        level_min = level_max - 0.02f;
-        break;
-    case id_usrp:
-        convert_input = 2;
-        short_to_float = 1.0f / (1 << 15);
-        level_max = 0.04f;
-        level_min = level_max - 0.02f;
-        break;
-    }
     // max parameters
     unsigned int max_len_symbol = FFT_32K + FFT_32K / 4 + P1_LEN;
     resample =  sample_rate / (SAMPLE_RATE * upsample);
@@ -92,6 +59,7 @@ dvbt2_demodulator::dvbt2_demodulator(id_device_t _id_device, float _sample_rate,
     mutex_out = new QMutex;
     deinterleaver = new time_deinterleaver(mutex_out);
     thread = new QThread;
+    thread->setObjectName("time_deinterleaver");
     deinterleaver->moveToThread(thread);
     connect(this, &dvbt2_demodulator::data, deinterleaver, &time_deinterleaver::execute);
     connect(this, &dvbt2_demodulator::l1_dyn_execute, deinterleaver, &time_deinterleaver::l1_dyn_execute);
@@ -127,6 +95,7 @@ void dvbt2_demodulator::reset()
     frequency_nco = 0;
     loop_filter_phase_offset.reset();
     phase_nco = 0.0f;
+    loop_filter_sample_rate_offset.reset();
     old_sample_rate_est = 0.0f;
     sample_rate_est_filtered = 0;
     resample =  sample_rate / (SAMPLE_RATE * upsample);
@@ -152,30 +121,24 @@ void dvbt2_demodulator::init_dvbt2()
     p2_init = true;
  }
 //-------------------------------------------------------------------------------------------
-void dvbt2_demodulator::execute(int _len_in, int16_t* _i_in, int16_t* _q_in, signal_estimate *signal_)
+void dvbt2_demodulator::execute(const int _len_in, complex* _in, signal_estimate* signal_)
 {
     mutex->lock();
 
-    int len_in = _len_in;
+    const int len_in = _len_in;
     int idx_in = 0;
-    int remain;
-    float real, imag;
-    float theta1 = 0.0f, theta2 = 0.0f, theta3 = 0.0f;
-
-    float nco_real, nco_imag;
-    double arbitrary_resample;
 
     while(idx_in < len_in) {
 
         if(est_chunk == 0) {
+            est_chunk = symbol_size;
             if(next_symbol_type == SYMBOL_TYPE_P1) est_chunk += P1_LEN;
-            est_chunk += symbol_size;
         }
 
-        arbitrary_resample = resample - sample_rate_est_filtered;
+        double arbitrary_resample = resample - sample_rate_est_filtered;
 
         chunk = static_cast<int>(std::nearbyint(est_chunk * arbitrary_resample * upsample));
-        remain = len_in - idx_in;
+        int remain = len_in - idx_in;
         if(chunk > remain) chunk = remain;
 
         phase_nco += phase_est_filtered;
@@ -185,21 +148,9 @@ void dvbt2_demodulator::execute(int _len_in, int16_t* _i_in, int16_t* _q_in, sig
         while(phase_nco < -M_PI_X_2) {
             phase_nco += M_PI_X_2;
         }
-
-        int j = 0;
+        const complex *in = _in + idx_in;
 
         for(int i = 0; i < chunk; ++i) {
-
-            j = (i + idx_in) * convert_input;
-            real = _i_in[j] * short_to_float;
-            imag = _q_in[j] * short_to_float;
-            //___DC offset remove____________
-            real -= exp_avg_dc_real(real);
-            imag -= exp_avg_dc_imag(imag);
-            //___IQ imbalance remove_________
-            est_1_bit_quantization(real, imag, theta1, theta2, theta3);
-            real *= c2;
-            imag += c1 * real;
             //___phase and frequency synchronization___
             frequency_nco -= frequency_est_filtered;
             while(frequency_nco > M_PI_X_2) {
@@ -215,61 +166,28 @@ void dvbt2_demodulator::execute(int _len_in, int16_t* _i_in, int16_t* _q_in, sig
             while(offset_nco < -M_PI_X_2) {
                 offset_nco += M_PI_X_2;
             }
-//            nco_real = cos_lut(offset_nco);
-//            nco_imag = sin_lut(offset_nco);
-            nco_real = cosf(offset_nco);
-            nco_imag = sinf(offset_nco);
+            float real = in[i].real();
+            float imag = in[i].imag();
+            float nco_real = cosf(offset_nco);
+            float nco_imag = sinf(offset_nco);
             out_derotate_sample[i].real(real * nco_real - imag * nco_imag);
             out_derotate_sample[i].imag(imag * nco_real + real * nco_imag);
             //_____________________________
-        }  
+        }
         idx_in += chunk;
-
         //___timing synchronization___
         int len_out_interpolator;
         interpolator(chunk, out_derotate_sample, arbitrary_resample,
                      len_out_interpolator, out_interpolator);
         int len_out_decimator;
         decimator->execute(len_out_interpolator, out_interpolator, len_out_decimator, out_decimator);
-
         //___demodulations and get offset synchronization__
         symbol_acquisition(len_out_decimator, out_decimator, signal_);
 
     }
-    //___IQ imbalance estimations___
-    c1 = theta1 / theta2;
-    float c_temp = theta3 / theta2;
-    c2 = sqrtf(c_temp * c_temp - c1 * c1);
-    //___level gain estimation___
-    level_detect = (theta2 * theta3) / len_in / len_in;
-    if(signal_->gain_changed) {
-        if(level_detect < level_min) {
-            signal_->gain_offset = 1;
-            signal_->change_gain = true;
-        }
-        else if(level_detect > level_max) {
-            signal_->gain_offset = -1;
-            signal_->change_gain = true;
-        }
-        else {
-            signal_->gain_offset = 0;
-            signal_->change_gain = false;
-        }
-    }
 
     mutex->unlock();
 
-}
-//-------------------------------------------------------------------------------------------
-void  dvbt2_demodulator::est_1_bit_quantization(float _real, float _imag,
-                                          float &_theta1, float &_theta2, float &_theta3)
-{
-    float sgn;
-    sgn = _real < 0 ? -1.0f : 1.0f;
-    _theta1 -= _imag * sgn;
-    _theta2 += _real * sgn;
-    sgn = _imag < 0 ? -1.0f : 1.0f;
-    _theta3 += _imag * sgn;
 }
 //-------------------------------------------------------------------------------------------
 void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_estimate* signal_)
@@ -340,7 +258,7 @@ void dvbt2_demodulator::symbol_acquisition(int _len_in, complex* _in, signal_est
                     sum += (cp[i] * conj(buffer_sym[i]));
                 }
                 frequency_est = atan2_approx(sum.imag(), sum.real()) / (dvbt2.fft_size << 1);
-                float max_integral = 1.0f / dvbt2.fft_size;
+                float max_integral = 0.5f / dvbt2.fft_size;
                 frequency_est_filtered += loop_filter_frequency_offset(frequency_est, max_integral);
             }
 

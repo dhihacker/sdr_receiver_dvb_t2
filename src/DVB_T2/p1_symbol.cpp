@@ -162,8 +162,9 @@ bool p1_symbol::execute(float _level_detect, const int _len_in, complex *_in, in
 
                 //__show__
                 memcpy(cor_os, cor_buffer.read(), sizeof(complex) * static_cast<unsigned int>(P1_A_PART));
+                complex *active_carrier = p1_fft + first_active_carrier;
                 for(int i = 0; i < P1_ACTIVE_CARRIERS; ++i) {
-                    p1_dbpsk[i] = (p1_fft + first_active_carrier)[p1_active_carriers[i]] * 0.1f;
+                    p1_dbpsk[i] = active_carrier[p1_active_carriers[i]] * 0.1f;
                 }
                 emit replace_spectrograph(P1_A_PART, p1_fft);
                 emit replace_constelation(P1_ACTIVE_CARRIERS, p1_dbpsk);

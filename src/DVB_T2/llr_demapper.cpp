@@ -77,6 +77,7 @@ llr_demapper::llr_demapper(QMutex* _mutex, QObject* parent) :
 
     decoder = new ldpc_decoder;
     thread = new QThread;
+    thread->setObjectName("ldpc_decoder");
     decoder->moveToThread(thread);
     connect(this, &llr_demapper::soft_multiplexer_de_twist, decoder, &ldpc_decoder::execute, Qt::BlockingQueuedConnection);
     connect(this, &llr_demapper::stop_decoder, decoder, &ldpc_decoder::stop);

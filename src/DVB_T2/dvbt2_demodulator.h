@@ -58,7 +58,7 @@ class dvbt2_demodulator : public QObject
     Q_OBJECT
 
 public:
-    explicit dvbt2_demodulator(id_device_t _id_device, float _sample_rate, QObject *parent = nullptr);
+    explicit dvbt2_demodulator(float _level_min, float _sample_rate, QObject *parent = nullptr);
     ~dvbt2_demodulator();
 
     QMutex* mutex;
@@ -77,7 +77,7 @@ signals:
     void finished();
 
 public slots:
-    void execute(int _len_in, int16_t* _i_in, int16_t* _q_in, signal_estimate* signal_);
+    void execute(const int _len_in, complex* _in, signal_estimate* signal_);
     void stop();
 
 private:

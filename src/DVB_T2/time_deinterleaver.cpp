@@ -24,6 +24,7 @@ time_deinterleaver::time_deinterleaver(QMutex *_mutex, QObject *parent) :
     mutex_out = new QMutex;
     qam = new llr_demapper(mutex_out);
     thread = new QThread;
+    thread->setObjectName("llr_demapper");
     qam->moveToThread(thread);
     connect(this, &time_deinterleaver::ti_block, qam, &llr_demapper::execute);
     connect(this, &time_deinterleaver::stop_qam, qam, &llr_demapper::stop);

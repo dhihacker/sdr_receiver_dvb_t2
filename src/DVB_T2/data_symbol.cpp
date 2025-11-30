@@ -121,8 +121,8 @@ complex* data_symbol::execute(int _idx_symbol, complex* _ofdm_cell,
     float sum_angle_2 = 0.0f;
     //    complex sum_dif_1 = {0.0f, 0.0f};
     //    complex sum_dif_2 = {0.0f, 0.0f};
-        float sum_dif_1 = 0.0f;
-        float sum_dif_2 = 0.0f;
+    float sum_dif_1 = 0.0f;
+    float sum_dif_2 = 0.0f;
     complex sum_pilot_1 = {0.0f, 0.0f};
     complex sum_pilot_2 = {0.0f, 0.0f};
     int idx_symbol = _idx_symbol;

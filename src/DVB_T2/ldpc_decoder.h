@@ -1,4 +1,5 @@
 /*
+ *  Copyright 2018,2019 Ahmet Inan, Ron Economos.
  *  Copyright 2020 Oleg Malyutin.
  *
  * This program is free software: you can redistribute it and/or modify
