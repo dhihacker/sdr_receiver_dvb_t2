@@ -44,13 +44,9 @@ public:
     {
         integral_error = old_integral_error + k_i * _in_error;
         out_error = integral_error + k_p * _in_error;
-        if(integral_error > max_integral_) {
-            integral_error = max_integral_;
-            out_error = integral_error;
-        }
-        else if(integral_error < -max_integral_) {
-            integral_error = -max_integral_;
-            out_error = integral_error;
+        if(abs(integral_error) > max_integral_) {
+            integral_error = 0;
+            out_error = 0;
         }
         old_integral_error = integral_error;
         return out_error;
