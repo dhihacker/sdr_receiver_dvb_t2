@@ -3,12 +3,32 @@
 //-------------------------------------------------------------------------------------------
 rx_airspy::rx_airspy(QObject *parent) : QObject(parent)
 {
+    int len_out_device = TRANSFER_BUFFER_SIZE_BYTES / 4;
+    int max_len_out = len_out_device * max_blocks;
+    out_a = new complex[max_len_out];
+    out_b = new complex[max_len_out];
 
+    sample_rate =  10000000;
+
+    demodulator = new dvbt2_demodulator(level_min, sample_rate);
+    thread.setObjectName("dvbt2_demodulator");
+    demodulator->moveToThread(&thread);
+    connect(&thread, &QThread::finished, demodulator, &dvbt2_demodulator::deleteLater);
+    connect(this, &rx_airspy::execute, demodulator, &dvbt2_demodulator::execute);
+    thread.start();
+
+    signal = new signal_estimate;
 }
 //-------------------------------------------------------------------------------------------
 rx_airspy::~rx_airspy()
 {
-
+    stop();
+    airspy_close(device);
+    thread.quit();
+    thread.wait();
+    delete signal;
+    delete[] out_a;
+    delete[] out_b;
 }
 //-------------------------------------------------------------------------------------------
 std::string rx_airspy::error (int err)
@@ -78,8 +98,6 @@ int rx_airspy::init(uint32_t _rf_frequence_hz, int _gain)
 
     if( err < 0 ) return err;
 
-    sample_rate = 1.0e+7f;
-
     err = airspy_set_samplerate(device, static_cast<uint32_t>(sample_rate));
 
     if( err < 0 ) return err;
@@ -94,31 +112,15 @@ int rx_airspy::init(uint32_t _rf_frequence_hz, int _gain)
         agc = true;
     }
     else{
+        agc = false;
         err =  airspy_set_sensitivity_gain(device, static_cast<uint8_t>(gain));
 
         if( err < 0 ) return err;
+
     }
 
     ch_frequency = _rf_frequence_hz;
     rf_frequency = ch_frequency;
-
-    uint len_out_device = 65536 * 2;
-    uint max_len_out = len_out_device * max_blocks;
-
-    buffer_a = new int16_t[max_len_out];
-    buffer_b = new int16_t[max_len_out];
-
-    signal = new signal_estimate;
-
-    demodulator = new dvbt2_demodulator(id_airspy, sample_rate);
-    thread = new QThread;
-    demodulator->moveToThread(thread);
-    connect(this, &rx_airspy::execute, demodulator, &dvbt2_demodulator::execute);
-    connect(this, &rx_airspy::stop_demodulator, demodulator, &dvbt2_demodulator::stop);
-    connect(demodulator, &dvbt2_demodulator::finished, demodulator, &dvbt2_demodulator::deleteLater);
-    connect(demodulator, &dvbt2_demodulator::finished, thread, &QThread::quit, Qt::DirectConnection);
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-    thread->start(QThread::TimeCriticalPriority);
 
     return err;
 }
@@ -129,6 +131,11 @@ void rx_airspy::start()
     int err;
     err = airspy_start_rx(device, rx_callback, this);
     if(err < 0) emit status(err);
+}
+//-------------------------------------------------------------------------------------------
+void rx_airspy::stop()
+{
+    airspy_stop_rx(device);
 }
 //-------------------------------------------------------------------------------------------
 void rx_airspy::reset()
@@ -143,7 +150,7 @@ void rx_airspy::reset()
     }
     signal->gain_offset = 0;
     signal->change_gain = true;
-    ptr_buffer = buffer_a;
+    ptr_out = out_a;
     swap_buffer = true;
     len_buffer = 0;
     blocks = 1;
@@ -212,11 +219,11 @@ int rx_airspy::rx_callback(airspy_transfer_t* transfer)
 
     int len_out_device;
     int16_t* ptr_rx_buffer;
-    len_out_device = transfer->sample_count  * 2;
+    len_out_device = transfer->sample_count;
     ptr_rx_buffer = static_cast<int16_t*>(transfer->samples);
     rx_airspy* ctx;
     ctx = static_cast<rx_airspy*>(transfer->ctx);
-    ctx->rx_execute(ptr_rx_buffer, len_out_device);
+    ctx->rx_execute(len_out_device, ptr_rx_buffer);
     if(transfer->dropped_samples > 0) {
         fprintf(stderr, "dropped_samples: %ld\n", transfer->dropped_samples);
     }
@@ -224,12 +231,12 @@ int rx_airspy::rx_callback(airspy_transfer_t* transfer)
     return 0;
 }
 //-------------------------------------------------------------------------------------------
-void rx_airspy::rx_execute(int16_t* _ptr_rx_buffer, int _len_out_device)
+void rx_airspy::rx_execute(int _len_out_device, int16_t* _ptr_rx_buffer)
 {
-    int len_out_device = _len_out_device;
-    for(int i = 0; i < len_out_device; ++i) ptr_buffer[i] = _ptr_rx_buffer[i];
-    len_buffer += len_out_device / 2;
-    ptr_buffer += len_out_device;
+    const int len_out_device = _len_out_device;
+    int gain_offset = 0;
+    correct.execute(len_out_device, _ptr_rx_buffer, ptr_out, gain_offset);
+    len_buffer += len_out_device;
 
     if(demodulator->mutex->try_lock()) {
 
@@ -244,15 +251,23 @@ void rx_airspy::rx_execute(int16_t* _ptr_rx_buffer, int _len_out_device)
         // coarse frequency setting
         set_rf_frequency();
         // AGC
+        if(gain_offset != 0 && signal->gain_changed){
+            signal->gain_offset = gain_offset;
+            signal->change_gain = true;
+        }
         set_gain();
 
         if(swap_buffer) {
-            emit execute(len_buffer, &buffer_a[0], &buffer_a[1], signal);
-            ptr_buffer = buffer_b;
+
+            emit execute(len_buffer, &out_a[0], signal);
+
+            ptr_out = out_b;
         }
         else {
-            emit execute(len_buffer, &buffer_b[0], &buffer_b[1], signal);
-            ptr_buffer = buffer_a;
+
+            emit execute(len_buffer, &out_b[0], signal);
+
+            ptr_out = out_a;
         }
         swap_buffer = !swap_buffer;
         len_buffer = 0;
@@ -267,23 +282,18 @@ void rx_airspy::rx_execute(int16_t* _ptr_rx_buffer, int _len_out_device)
             blocks = 1;
             len_buffer = 0;
             if(swap_buffer) {
-                ptr_buffer = buffer_a;
+                ptr_out = out_a;
             }
             else {
-                ptr_buffer = buffer_b;
+                ptr_out = out_b;
             }
         }
+        else {
+            ptr_out += len_out_device;
+        }
     }
+
 }
 //-------------------------------------------------------------------------------------------
-void rx_airspy::stop()
-{
-    airspy_close(device);
-    emit stop_demodulator();
-    if(thread->isRunning()) {
-        thread->wait(1000);
-    }
-    emit finished();
-}
-//-------------------------------------------------------------------------------------------
+
 

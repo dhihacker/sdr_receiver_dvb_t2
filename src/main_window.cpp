@@ -181,6 +181,7 @@ int main_window::start_sdrplay()
     if(err !=0) return err;
 
     thread = new QThread;
+    thread->setObjectName("sdrplay");
     ptr_sdrplay->moveToThread(thread);
     connect(thread, SIGNAL(started()), ptr_sdrplay, SLOT(start()));
     connect(this,SIGNAL(stop_device()),ptr_sdrplay,SLOT(stop()),Qt::DirectConnection);
@@ -238,6 +239,7 @@ int main_window::start_airspy()
     if(err !=0) return err;
 
     thread = new QThread;
+    thread->setObjectName("airspy");
     ptr_airspy->moveToThread(thread);
     connect(thread, SIGNAL(started()), ptr_airspy, SLOT(start()));
     connect(this,SIGNAL(stop_device()),ptr_airspy,SLOT(stop()),Qt::DirectConnection);
@@ -272,7 +274,7 @@ void main_window::open_plutosdr()
    std::string ip = ui->line_edit_ip->text().toStdString();
    std::string ser_no;
    std::string hw_ver;
-   ptr_plutosdr = new rx_plutosdr_daemon;
+   ptr_plutosdr = new rx_pluto;
    ui->text_log->insertPlainText("Get PlutoSDR: wait for load usb daemon ...\n");
    ui->text_log->repaint();
    err = ptr_plutosdr->get(ip, ser_no, hw_ver);
@@ -305,6 +307,7 @@ int main_window::start_plutosdr()
    if(err !=0) return err;
 
    thread = new QThread;
+   thread->setObjectName("plutosdr");
    ptr_plutosdr->moveToThread(thread);
    connect(thread, SIGNAL(started()), ptr_plutosdr, SLOT(start()));
    connect(this,SIGNAL(stop_device()),ptr_plutosdr,SLOT(stop()),Qt::DirectConnection);
@@ -313,9 +316,9 @@ int main_window::start_plutosdr()
    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
    thread->start(QThread::TimeCriticalPriority);
 
-   connect(ptr_plutosdr, &rx_plutosdr_daemon::status, this, &main_window::status_plutosdr);
-   connect(ptr_plutosdr, &rx_plutosdr_daemon::radio_frequency, this, &main_window::radio_frequency);
-   connect(ptr_plutosdr, &rx_plutosdr_daemon::level_gain, this, &main_window::level_gain);
+   connect(ptr_plutosdr, &rx_pluto::status, this, &main_window::status_plutosdr);
+   connect(ptr_plutosdr, &rx_pluto::radio_frequency, this, &main_window::radio_frequency);
+   connect(ptr_plutosdr, &rx_pluto::level_gain, this, &main_window::level_gain);
 
     return 0;
 }
@@ -366,6 +369,7 @@ int main_window::start_hackrf_one()
     if(err !=0) return err;
 
     thread = new QThread;
+    thread->setObjectName("hackrf_one");
     ptr_hackrf_one->moveToThread(thread);
     connect(thread, SIGNAL(started()), ptr_hackrf_one, SLOT(start()));
     connect(this,SIGNAL(stop_device()),ptr_hackrf_one,SLOT(stop()),Qt::DirectConnection);
@@ -427,10 +431,12 @@ int main_window::start_usrp()
     if(err !=0) return err;
 
     thread = new QThread;
+    thread->setObjectName("usrp");
     ptr_usrp->moveToThread(thread);
+    connect(thread, &QThread::finished, ptr_usrp, &rx_usrp::deleteLater);
     connect(thread, SIGNAL(started()), ptr_usrp, SLOT(start()));
     connect(this,SIGNAL(stop_device()),ptr_usrp,SLOT(stop()),Qt::DirectConnection);
-    connect(ptr_usrp, SIGNAL(finished()), ptr_usrp, SLOT(deleteLater()));
+    connect(this, SIGNAL(finished()), ptr_usrp, SLOT(deleteLater()));
     connect(ptr_usrp, SIGNAL(finished()), thread, SLOT(quit()),Qt::DirectConnection);
     connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
     thread->start(QThread::TimeCriticalPriority);

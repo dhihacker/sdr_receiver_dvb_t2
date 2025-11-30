@@ -17,10 +17,10 @@
 
 #include <QObject>
 #include <QTime>
-#include <QApplication>
 #include <string>
 
 #include "sdrplay/mir_sdr.h"
+#include "DSP/iq_correct.hh"
 #include "DVB_T2/dvbt2_demodulator.h"
 
 class rx_sdrplay : public QObject
@@ -36,19 +36,17 @@ public:
     dvbt2_demodulator* demodulator;
 
 signals:
-    void execute(int _len_in, short* _i_in, short* _q_in, signal_estimate* signal_);
+    void execute(int _len, complex* _in, signal_estimate* signal_);
     void status(int _err);
     void radio_frequency(double _rf);
     void level_gain(int _gain);
-    void stop_demodulator();
-    void finished();
 
 public slots:
     void start();
     void stop();
 
 private:
-    QThread* thread;
+    QThread thread;
     signal_estimate* signal;
 
     int gain_db;
@@ -62,21 +60,22 @@ private:
     const int max_symbol = FFT_32K + FFT_32K / 4 + P1_LEN;
     const int max_blocks = max_symbol / 384 * 32;
     const int norm_blocks = max_symbol / 384 * 4;
-    int max_len_out;
-    int len_buffer;
     int  blocks;
-    short *i_buffer_a, *q_buffer_a;
-    short *i_buffer_b, *q_buffer_b;
-    short* ptr_i_bubber;
-    short* ptr_q_buffer;
-    bool swap_buffer = true;
-    bool agc = false;
-    bool done = true;
-    int gain_offset = 0;
+    int16_t *i_device_buffer, *q_device_buffer;
+    int16_t *ptr_i_device_buffer, *ptr_q_device_buffer;
+    complex* out_a, *out_b, *ptr_out;
+    bool swap_buffer;
+    bool agc;
+    bool done;
 
     void reset();
     void set_rf_frequency();
     void set_gain();
+    const int bits = 14;
+    const float level_max = 0.04f;
+    const float level_min = 0.02f;
+    iq_correct<int16_t> correct{bits, level_max, level_min};
+
 };
 
 #endif // RX_SDRPLAY_H

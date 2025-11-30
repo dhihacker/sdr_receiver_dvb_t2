@@ -17,12 +17,23 @@
 //-------------------------------------------------------------------------------------------
 rx_sdrplay::rx_sdrplay(QObject *parent) : QObject(parent)
 {  
+    sample_rate = 9200000.0f; // max for 10bit (10000000.0f for 8bit)
 
+    demodulator = new dvbt2_demodulator(level_min, sample_rate);
+    thread.setObjectName("dvbt2_demodulator");
+    demodulator->moveToThread(&thread);
+    connect(&thread, &QThread::finished, demodulator, &dvbt2_demodulator::deleteLater);
+    connect(this, &rx_sdrplay::execute, demodulator, &dvbt2_demodulator::execute);
+    thread.start();
+
+    signal = new signal_estimate;
 }
 //-------------------------------------------------------------------------------------------
 rx_sdrplay::~rx_sdrplay()
 {
-
+    thread.quit();
+    thread.wait();
+    delete signal;
 }
 //-------------------------------------------------------------------------------------------
 std::string rx_sdrplay::error (int err)
@@ -97,31 +108,13 @@ mir_sdr_ErrT rx_sdrplay::init(double _rf_frequence, int _gain_db)
         gain_db = 78;
         agc = true;
     }
-    sample_rate = 9200000.0f; // max for 10bit (10000000.0f for 8bit)
+
     double sample_rate_mhz = static_cast<double>(sample_rate) / 1.0e+6;
     double rf_chanel_mhz = static_cast<double>(rf_frequency) / 1.0e+6;
     err = mir_sdr_Init(gain_db, sample_rate_mhz, rf_chanel_mhz,
                                  mir_sdr_BW_8_000, mir_sdr_IF_Zero, &len_out_device);
 
     if(err != 0) return err;
-
-    max_len_out = len_out_device * max_blocks;
-    i_buffer_a = new short[max_len_out];
-    q_buffer_a = new short[max_len_out];
-    i_buffer_b = new short[max_len_out];
-    q_buffer_b = new short[max_len_out];
-
-    demodulator = new dvbt2_demodulator(id_sdrplay, sample_rate);
-    thread = new QThread;
-    demodulator->moveToThread(thread);
-    connect(this, &rx_sdrplay::execute, demodulator, &dvbt2_demodulator::execute);
-    connect(this, &rx_sdrplay::stop_demodulator, demodulator, &dvbt2_demodulator::stop);
-    connect(demodulator, &dvbt2_demodulator::finished, demodulator, &dvbt2_demodulator::deleteLater);
-    connect(demodulator, &dvbt2_demodulator::finished, thread, &QThread::quit, Qt::DirectConnection);
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-    thread->start();
-
-    signal = new signal_estimate;
 
     reset();
 
@@ -140,10 +133,10 @@ void rx_sdrplay::reset()
     }
     signal->gain_offset = 0;
     signal->change_gain = true;
-    ptr_i_bubber = i_buffer_a;
-    ptr_q_buffer = q_buffer_a;
+    ptr_i_device_buffer = i_device_buffer;
+    ptr_q_device_buffer = q_device_buffer;
+    ptr_out = out_a;
     swap_buffer = true;
-    len_buffer = 0;
     blocks = norm_blocks;;
     set_rf_frequency();
     set_gain();
@@ -184,31 +177,50 @@ void rx_sdrplay::set_gain()
         gain_db -= signal->gain_offset;
         mir_sdr_ErrT err = mir_sdr_SetGr(gain_db, 1, 0);
         if(err != 0) {
+
             emit status(err);
+
         }
         else{
+
             emit level_gain(gain_db);
+
         }
     }
 }
 //-------------------------------------------------------------------------------------------
 void rx_sdrplay::start()
 {
-    ptr_i_bubber = i_buffer_a;
-    ptr_q_buffer = q_buffer_a;
-    unsigned int first_sample_num;
+    int max_len_out = len_out_device * max_blocks;
+    i_device_buffer = new int16_t[max_len_out];
+    q_device_buffer = new int16_t[max_len_out];
+    ptr_i_device_buffer = i_device_buffer;
+    ptr_q_device_buffer = q_device_buffer;
+    out_a = new complex[max_len_out];
+    out_b = new complex[max_len_out];
+    ptr_out = out_a;
+    int len_buffer = 0;
+    uint32_t first_sample_num;
     int gr_changed = 0;
     int rf_changed = 0;
-    int fs_changed = 0;   
+    int fs_changed = 0;
+
+    done = true;
 
     while(done) {
 
+        int num_rx_samps = 0;
+        int16_t *ptr_i = ptr_i_device_buffer;
+        int16_t *ptr_q = ptr_q_device_buffer;
+
         for(int n = 0; n < blocks; ++n) {
 
-            mir_sdr_ErrT err = mir_sdr_ReadPacket(ptr_i_bubber, ptr_q_buffer, &first_sample_num,
+            mir_sdr_ErrT err = mir_sdr_ReadPacket(ptr_i_device_buffer, ptr_q_device_buffer, &first_sample_num,
                                      &gr_changed, &rf_changed, &fs_changed);
             if(err != 0) {
+
                 emit status(err);
+
             }
             if(rf_changed) {
                 rf_changed = 0;
@@ -218,10 +230,16 @@ void rx_sdrplay::start()
                 gr_changed = 0;
                 gain_changed = true;
             }
-            len_buffer += len_out_device;
-            ptr_i_bubber += len_out_device;
-            ptr_q_buffer += len_out_device;
+            num_rx_samps += len_out_device;
+            ptr_i_device_buffer += len_out_device;
+            ptr_q_device_buffer += len_out_device;
+
         }
+
+        int gain_offset;
+        correct.execute(num_rx_samps, ptr_i, ptr_q, ptr_out, gain_offset);
+        len_buffer += num_rx_samps;
+        ptr_out += num_rx_samps;
 
         if(demodulator->mutex->try_lock()) {
 
@@ -236,19 +254,27 @@ void rx_sdrplay::start()
             // coarse frequency setting
             set_rf_frequency();
             // AGC
+            if(gain_offset != 0 && signal->gain_changed){
+                signal->gain_offset = gain_offset;
+                signal->change_gain = true;
+            }
             set_gain();
 
             if(swap_buffer) {
-                emit execute(len_buffer, i_buffer_a, q_buffer_a, signal);
-                ptr_i_bubber = i_buffer_b;
-                ptr_q_buffer = q_buffer_b;
+
+                emit execute(len_buffer, out_a, signal);
+
+                ptr_out = out_b;
             }
             else {
-                emit execute(len_buffer, i_buffer_b, q_buffer_b, signal);
-                ptr_i_bubber = i_buffer_a;
-                ptr_q_buffer = q_buffer_a;
+
+                emit execute(len_buffer, out_b, signal);
+
+                ptr_out = out_a;
             }
             swap_buffer = !swap_buffer;
+            ptr_i_device_buffer = i_device_buffer;
+            ptr_q_device_buffer = q_device_buffer;
             len_buffer = 0;
             blocks = norm_blocks;
 
@@ -263,13 +289,13 @@ void rx_sdrplay::start()
                 len_buffer = 0;
                 blocks = norm_blocks;;
                 fprintf(stderr, "reset buffer blocks: %d\n", blocks);
+                ptr_i_device_buffer = i_device_buffer;
+                ptr_q_device_buffer = q_device_buffer;
                 if(swap_buffer) {
-                    ptr_i_bubber = i_buffer_a;
-                    ptr_q_buffer = q_buffer_a;
+                    ptr_out = out_a;
                 }
                 else {
-                    ptr_i_bubber = i_buffer_b;
-                    ptr_q_buffer = q_buffer_b;
+                    ptr_out = out_b;
                 }
             }
         }
@@ -277,13 +303,11 @@ void rx_sdrplay::start()
 
     mir_sdr_Uninit();
     mir_sdr_ReleaseDeviceIdx();
-    emit stop_demodulator();
-    if(thread->isRunning()) thread->wait(1000);
-    delete [] i_buffer_a;
-    delete [] q_buffer_a;
-    delete [] i_buffer_b;
-    delete [] q_buffer_b;
-    emit finished();
+    delete [] i_device_buffer;
+    delete [] q_device_buffer;
+    delete [] out_a;
+    delete [] out_b;
+
 }
 //-------------------------------------------------------------------------------------------
 void rx_sdrplay::stop()

@@ -3,15 +3,34 @@
 //-------------------------------------------------------------------------------------------
 rx_usrp::rx_usrp(QObject *parent) : QObject(parent)
 {
-    max_len_out = len_out_device * max_blocks;
-    buffer_a = new int16_t[max_len_out];
-    buffer_b = new int16_t[max_len_out];
+    uint64_t max_len_out = len_out_device * max_blocks / 2;
+    device_buffer = new int16_t[len_out_device];
+    out_a = new complex[max_len_out];
+    out_b = new complex[max_len_out];
+
+    sample_rate = 10000000.0;
+
+    demodulator = new dvbt2_demodulator(level_min, sample_rate);
+    thread.setObjectName("dvbt2_demodulator");
+    demodulator->moveToThread(&thread);
+    connect(&thread, &QThread::finished, demodulator, &dvbt2_demodulator::deleteLater);
+    connect(this, &rx_usrp::execute, demodulator, &dvbt2_demodulator::execute);
+    thread.start();
+
+    signal = new signal_estimate;
+
+    is_start = false;
 }
 //-------------------------------------------------------------------------------------------
 rx_usrp::~rx_usrp()
 {
-    delete[] buffer_a;
-    delete[] buffer_b;
+    stop();
+    thread.quit();
+    thread.wait();
+    delete signal;
+    delete[] device_buffer;
+    delete[] out_a;
+    delete[] out_b;
 }
 //-------------------------------------------------------------------------------------------
 std::string rx_usrp::error(int err)
@@ -75,7 +94,7 @@ int rx_usrp::get(std::string &_ser_no, std::string &_hw_ver)
 //-------------------------------------------------------------------------------------------
 int rx_usrp::init(uint32_t _rf_frequency, int _gain_db)
 {
-    sample_rate = 10000000.0;
+
     ch_frequency = _rf_frequency;
     rf_frequency = ch_frequency;
     gain_db = _gain_db;
@@ -83,38 +102,68 @@ int rx_usrp::init(uint32_t _rf_frequency, int _gain_db)
         gain_db = 0;
         agc = true;
     }
+    else{
+        agc = false;
+    }
 
-    uhd::device_addr_t device_addr{"uhd"};
-    device = uhd::usrp::multi_usrp::make(device_addr);
-    device->set_rx_rate(sample_rate, chan);
-    device->set_rx_freq(uhd::tune_request_t(rf_frequency), chan);
-    device->set_rx_bandwidth(8000000, chan);
-    device->set_rx_agc(false, chan);
-    device->set_rx_dc_offset(0, chan);
-    device->set_rx_iq_balance(0, chan);
-    device->set_rx_gain(gain_db, chan);
+    uhd_error err;
+    err = uhd_usrp_make(&device, "uhd,num_recv_frames=128");
 
-    float sr = sample_rate;
-    demodulator = new dvbt2_demodulator(id_usrp, sr);
-    thread = new QThread;
-    demodulator->moveToThread(thread);
-    connect(this, &rx_usrp::execute, demodulator, &dvbt2_demodulator::execute);
-    connect(this, &rx_usrp::stop_demodulator, demodulator, &dvbt2_demodulator::stop);
-    connect(demodulator, &dvbt2_demodulator::finished, demodulator, &dvbt2_demodulator::deleteLater);
-    connect(demodulator, &dvbt2_demodulator::finished, thread, &QThread::quit, Qt::DirectConnection);
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-    thread->start();
+    if(err != 0) {
+        if(device != nullptr) uhd_usrp_free(&device);
 
-    signal = new signal_estimate;
+        return err;
 
-    return 0;
+    }
+
+    err = uhd_usrp_set_rx_rate(device, sample_rate, 0);
+
+    if(err != 0) return err;
+
+    tune_request.args = (char*)"";
+    tune_request.rf_freq_policy  = UHD_TUNE_REQUEST_POLICY_AUTO;
+    tune_request.dsp_freq_policy = UHD_TUNE_REQUEST_POLICY_AUTO;
+    tune_request.target_freq = rf_frequency;
+    err = uhd_usrp_set_rx_freq(device, &tune_request, 0, &tune_result);
+
+    if(err != 0) return err;
+
+    err = uhd_usrp_set_rx_bandwidth(device, 8000000.0, 0);
+
+    if(err != 0) return err;
+
+    err = uhd_usrp_set_rx_gain(device, gain_db, 0, "");
+
+    if(err != 0) return err;
+
+    err = uhd_usrp_set_rx_agc(device, false, 0);
+
+    if(err != 0) return err;
+
+    err = uhd_usrp_set_rx_dc_offset_enabled(device, false, 0);
+
+    if(err != 0) return err;
+
+    err = uhd_usrp_set_rx_iq_balance_enabled(device, false, 0);
+
+    if(err != 0) return err;
+
+    return err;
 }
 //-------------------------------------------------------------------------------------------
 void rx_usrp::start()
 {
+    is_start = true;
     reset();
-
     work(len_out_device);
+}
+//-------------------------------------------------------------------------------------------
+void rx_usrp::stop()
+{
+    if(is_start){
+        is_start = false;
+        done = false;
+    }
 }
 //-------------------------------------------------------------------------------------------
 void rx_usrp::reset()
@@ -129,15 +178,13 @@ void rx_usrp::reset()
     }
     signal->gain_offset = 0;
     signal->change_gain = true;
-    ptr_buffer = buffer_a;
+    ptr_out = out_a;
     swap_buffer = true;
     len_buffer = 0;
     blocks = 1;
 
-    future.waitForFinished();
-    future = QtConcurrent::run(this, &rx_usrp::update);
-
     emit level_gain(gain_db);
+    emit radio_frequency(rf_frequency);
 
     qDebug() << "rx_usrp::reset";
 }
@@ -149,20 +196,25 @@ void rx_usrp::set_rf_frequency()
         float mseconds = (end_wait_frequency_changed - start_wait_frequency_changed) /
                          (CLOCKS_PER_SEC / 1000);
         if(mseconds > 100) {
+            double freq;
+            uhd_usrp_get_rx_freq(device, 0, &freq);
+            uint32_t fq = freq;
             signal->frequency_changed = true;
-            rf_frequency =device->get_rx_freq(chan);
 
-            emit radio_frequency(rf_frequency);
+            emit radio_frequency(fq);
+
         }
     }
     if(signal->change_frequency) {
         signal->change_frequency = false;
         signal->correct_resample = signal->coarse_freq_offset / static_cast<float>(rf_frequency);
         rf_frequency += static_cast<uint32_t>(signal->coarse_freq_offset);
-        int err = 0;
-        device->set_rx_freq(uhd::tune_request_t(rf_frequency), chan);
+        tune_request.target_freq = rf_frequency;
+        int err = uhd_usrp_set_rx_freq(device, &tune_request, 0, &tune_result);
         if(err != 0) {
+
             emit status(err);
+
         }
         else{
             signal->frequency_changed = false;
@@ -178,24 +230,26 @@ void rx_usrp::set_gain()
         end_wait_gain_changed = clock();
         float mseconds = (end_wait_gain_changed - start_wait_gain_changed) /
                           (CLOCKS_PER_SEC / 1000);
-        if(mseconds > 50) {
+        if(mseconds > 10) {
             signal->gain_changed = true;
+
             emit level_gain(gain_db);
+
         }
     }
     if(agc && signal->change_gain) {
         signal->change_gain = false;
 
         gain_db += signal->gain_offset;
-
-        if(gain_db > 78) {
+        if(gain_db > 100) {
             gain_db = 0;
         }
         double gain = gain_db;
-        int err = 0;
-        device->set_rx_gain(gain, chan);
+        int err =  uhd_usrp_set_rx_gain(device, gain, 0, "");
         if(err != 0) {
+
             emit status(err);
+
         }
         else{
             signal->gain_changed = false;
@@ -204,33 +258,70 @@ void rx_usrp::set_gain()
     }
 }
 //-------------------------------------------------------------------------------------------
-void rx_usrp::update()
-{
-    // coarse frequency setting
-    set_rf_frequency();
-    // AGC
-    set_gain();
-}
-//-------------------------------------------------------------------------------------------
 void rx_usrp::work(uint32_t len_out_device)
 {
-    uhd::stream_args_t stream_args("sc16","sc16");
-    rx_streamer = device->get_rx_stream(stream_args);
+    int err = 0;
+    uhd_rx_streamer_handle rx_streamer;
+    err = uhd_rx_streamer_make(&rx_streamer);
+    if(err != 0){
+        fprintf(stderr, "rx_usrp::work uhd_rx_streamer_make error %d\n", err);
 
-    uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+        return;
+
+    }
+    size_t channel = 0;
+    uhd_stream_args_t stream_args = {
+        .cpu_format = (char*)"sc16",
+        .otw_format = (char*)"sc16",
+        .args = (char*)"",
+        .channel_list = &channel,
+        .n_channels = 1
+    };
+    err = uhd_usrp_get_rx_stream(device, &stream_args, rx_streamer);
+    if(err != 0){
+        fprintf(stderr, "rx_usrp::work uhd_usrp_get_rx_stream error %d\n", err);
+
+        return;
+
+    }
+
+    uhd_stream_cmd_t stream_cmd;
+    stream_cmd.stream_mode = UHD_STREAM_MODE_START_CONTINUOUS;
     stream_cmd.stream_now = true;
-    rx_streamer->issue_stream_cmd(stream_cmd);
+    err = uhd_rx_streamer_issue_stream_cmd(rx_streamer, &stream_cmd);
+    if(err != 0){
+        fprintf(stderr, "rx_usrp::work uhd_rx_streamer_issue_stream_cmd error %d\n", err);
 
-    const double timeout = 1.0;
-    const bool one_packet = false;
-    const int len_request = len_out_device / 2;
+        return;
+
+    }
+    uhd_rx_metadata_handle metadata;
+    err = uhd_rx_metadata_make(&metadata);
+    if(err != 0){
+        fprintf(stderr, "rx_usrp::work uhd_rx_metadata_make error %d\n", err);
+
+        return;
+
+    }
+
+    size_t num_rx_samps = 0;
+    int len_request = len_out_device / 2;
+    done  = true;
 
     while(done){
 
-        size_t num_samples = rx_streamer->recv(ptr_buffer, len_request, metadata, timeout, one_packet);
+        void *buffer = device_buffer;
+        uhd_rx_streamer_recv(rx_streamer, &buffer, len_request, &metadata, 0.1, false, &num_rx_samps);
 
-        len_buffer += num_samples;
-        ptr_buffer += num_samples * 2;
+        int gain_offset = 0;
+        correct.execute(num_rx_samps, device_buffer, ptr_out, gain_offset);
+        len_buffer += num_rx_samps;
+        // AGC
+        if(gain_offset != 0 && signal->gain_changed){
+            signal->gain_offset = gain_offset;
+            signal->change_gain = true;
+        }
+        set_gain();
 
         if(demodulator->mutex->try_lock()) {
 
@@ -239,51 +330,56 @@ void rx_usrp::work(uint32_t len_out_device)
 
                 demodulator->mutex->unlock();
 
-                continue;
+                return;
 
             }
-            if(future.isFinished()){
-                future = QtConcurrent::run(this, &rx_usrp::update);
-            }
+            // coarse frequency setting
+            set_rf_frequency();
 
-            if(swap_buffer) {
-                emit execute(len_buffer, &buffer_a[0], &buffer_a[1], signal);
-                ptr_buffer = buffer_b;
+            if(swap_buffer){
+
+                emit execute(len_buffer, out_a, signal);
+
+                ptr_out = out_b;
             }
-            else {
-                emit execute(len_buffer, &buffer_b[0], &buffer_b[1], signal);
-                ptr_buffer = buffer_a;
+            else{
+
+                emit execute(len_buffer, out_b, signal);
+
+                ptr_out = out_a;
             }
             swap_buffer = !swap_buffer;
+
             len_buffer = 0;
             blocks = 1;
 
             demodulator->mutex->unlock();
         }
         else {
-            ++blocks;
-            if(blocks > max_blocks) {
-                fprintf(stderr, "reset buffer blocks: %d\n", blocks);
-                blocks = 1;
+            if(++blocks > max_blocks) {
                 len_buffer = 0;
+                blocks = 1;
+                fprintf(stderr, "rx_usrp::work reset buffers\n");
                 if(swap_buffer) {
-                    ptr_buffer = buffer_a;
+                    ptr_out = out_a;
                 }
                 else {
-                    ptr_buffer = buffer_b;
+                    ptr_out = out_b;
                 }
             }
+            else{
+                ptr_out += num_rx_samps;
+            }
         }
+
     }
 
-    rx_streamer->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+    stream_cmd.stream_mode = UHD_STREAM_MODE_STOP_CONTINUOUS;
+    uhd_rx_streamer_issue_stream_cmd(rx_streamer, &stream_cmd);
+    uhd_rx_streamer_free(&rx_streamer);
+    uhd_rx_metadata_free(&metadata);
+    uhd_usrp_free(&device);
 
 }
 //-------------------------------------------------------------------------------------------
-void rx_usrp::stop()
-{
-    done = false;
 
-    emit finished();
-}
-//-------------------------------------------------------------------------------------------

@@ -22,11 +22,11 @@
 #include "rx_airspy.h"
 #include "rx_hackrf_one.h"
 #include "rx_usrp.h"
-#include "rx_plutosdr_daemon.h"
+#include "rx_pluto.h"
 #include "plot.h"
 #include "DVB_T2/dvbt2_demodulator.h"
 
-Q_DECLARE_METATYPE(bb_de_header::id_out);
+Q_DECLARE_METATYPE(bb_de_header::id_out)
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class main_window; }
@@ -48,6 +48,7 @@ signals:
     void set_out(bb_de_header::id_out _id_current_out, int _num_port_udp,
                  QString _file_name, int _need_plp);
     void stop_device();
+    void finished();
 
 private slots:
     void device_found(ushort id_vendor, ushort id_product);
@@ -101,7 +102,7 @@ private:
     int start_airspy();
     int start_hackrf_one();
     int start_usrp();
-    rx_plutosdr_daemon* ptr_plutosdr;
+    rx_pluto* ptr_plutosdr;
     int start_plutosdr();
     void connect_info();
     void disconnect_info();

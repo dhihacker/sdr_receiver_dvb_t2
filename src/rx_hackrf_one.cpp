@@ -22,20 +22,33 @@
 //----------------------------------------------------------------------------------------------------------------------------
 rx_hackrf_one::rx_hackrf_one(QObject *parent) : QObject(parent)
 {
-//    hackrf_init(); /* call only once before the first open */
-    fprintf(stderr,"rx_hackrf::rx_hackrf\n");
+    int max_len_out = len_out_device * max_blocks;
+    out_a = new complex[max_len_out];
+    out_b = new complex[max_len_out];
+
+    sample_rate = 10000000.0f;
+
+    demodulator = new dvbt2_demodulator(level_min, sample_rate);
+    thread.setObjectName("dvbt2_demodulator");
+    demodulator->moveToThread(&thread);
+    connect(&thread, &QThread::finished, demodulator, &dvbt2_demodulator::deleteLater);
+    connect(this, &rx_hackrf_one::execute, demodulator, &dvbt2_demodulator::execute);
+    thread.start();
+
+    signal = new signal_estimate;
+
+    is_start = false;
 
 }
 //-------------------------------------------------------------------------------------------
 rx_hackrf_one::~rx_hackrf_one()
 {
-    hackrf_exit(); /* call only once after last close */
-    if(buffer_a)
-    {
-        delete buffer_a;
-        delete buffer_b;
-    }
-    fprintf(stderr,"rx_hackrf::~rx_hackrf\n");
+    stop();
+    thread.quit();
+    thread.wait();
+    delete signal;
+    delete[] out_a;
+    delete[] out_b;
 }
 //-------------------------------------------------------------------------------------------
 std::string rx_hackrf_one::error (int err)
@@ -153,61 +166,62 @@ int rx_hackrf_one::get(std::string &_ser_no, std::string &_hw_ver)
     return err;
 
 }
-
 //----------------------------------------------------------------------------------------------------------------------------
 int rx_hackrf_one::init(double _rf_frequency, int _gain_db)
 {
-    int ret = 0;
-    fprintf(stderr,"hackrf init\n");
     rf_frequency = _rf_frequency;
     ch_frequency = _rf_frequency;
     gain_db = _gain_db;
     if(gain_db < 0) {
-        gain_db = 78;
+        gain_db = 0;
         agc = true;
     }
-    sample_rate = 10000000.0f; // max for 10bit (10000000.0f for 8bit)
-    ret = hackrf_open(&device );
-    hackrf_set_sample_rate(device, sample_rate );
-    hackrf_set_freq(device, uint64_t(rf_frequency) );
-    uint32_t bw = hackrf_compute_baseband_filter_bw( uint32_t(8000000.0) );
-    ret = hackrf_set_baseband_filter_bandwidth(device, bw );
+    else{
+        agc = false;
+    }
 
-    hackrf_set_lna_gain(device, 40);
-    hackrf_set_vga_gain(device, 12);
-    hackrf_set_amp_enable(device, 1);
+    int err = 0;
+    err = hackrf_open(&device);
 
-    if(ret != 0) return ret;
+    if(err != HACKRF_SUCCESS) return err;
 
-    max_len_out = len_out_device * max_blocks;
-    buffer_a = new short[max_len_out];
-    buffer_b = new short[max_len_out];
+    err = hackrf_set_sample_rate(device, sample_rate);
 
-    demodulator = new dvbt2_demodulator(id_hackrf, sample_rate);
-    thread = new QThread;
-    demodulator->moveToThread(thread);
-    connect(this, &rx_hackrf_one::execute, demodulator, &dvbt2_demodulator::execute);
-    connect(this, &rx_hackrf_one::stop_demodulator, demodulator, &dvbt2_demodulator::stop);
-    connect(demodulator, &dvbt2_demodulator::finished, demodulator, &dvbt2_demodulator::deleteLater);
-    connect(demodulator, &dvbt2_demodulator::finished, thread, &QThread::quit, Qt::DirectConnection);
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-    thread->start();
+    if(err != HACKRF_SUCCESS) return err;
 
-    signal = new signal_estimate;
+    err = hackrf_set_freq(device, uint64_t(rf_frequency));
+
+    if(err != HACKRF_SUCCESS) return err;
+
+    uint32_t bw = hackrf_compute_baseband_filter_bw(uint32_t(8000000));
+    err = hackrf_set_baseband_filter_bandwidth(device, bw);
+
+    if(err != HACKRF_SUCCESS) return err;
 
     reset();
 
-    return ret;
+    return err;
 }
 //-------------------------------------------------------------------------------------------
 void rx_hackrf_one::start()
 {
     reset();
-    int err;
-    ptr_buffer = buffer_a;
-    err = hackrf_start_rx(device, callback, (void*) this);
-    len_buffer = 0;
-    fprintf(stderr, "hackrf start rx %d\n", err);
+
+    int err = hackrf_start_rx(device, callback, (void*)this);
+    if(err == HACKRF_SUCCESS){
+        is_start = true;
+    }
+}
+//-------------------------------------------------------------------------------------------
+void rx_hackrf_one::stop()
+{
+    if(is_start == true){
+        hackrf_stop_rx(device);
+        future.cancel();
+        future.waitForFinished();
+    }
+    hackrf_close(device);
+    hackrf_exit();
 }
 //-------------------------------------------------------------------------------------------
 void rx_hackrf_one::reset()
@@ -218,19 +232,20 @@ void rx_hackrf_one::reset()
     signal->change_frequency = true;
     signal->correct_resample = 0.0;
     if(agc){
-        gain_db = 20;
+        gain_db = 0;
     }
     signal->gain_offset = 0;
     signal->change_gain = true;
-    ptr_buffer = buffer_a;
+    ptr_out = out_a;
     swap_buffer = true;
     len_buffer = 0;
     blocks = 1;
 
     future.waitForFinished();
-    future = QtConcurrent::run(this, &rx_hackrf_one::update);
+    future = QtConcurrent::run(this, &rx_hackrf_one::update, gain_db);
 
     emit level_gain(gain_db);
+    emit radio_frequency(rf_frequency);
 
     qDebug() << "rx_hackrf::reset";
 }
@@ -240,7 +255,7 @@ void rx_hackrf_one::set_rf_frequency()
     if(!signal->frequency_changed){
         end_wait_frequency_changed = clock();
         float mseconds = (end_wait_frequency_changed - start_wait_frequency_changed) /
-                (CLOCKS_PER_SEC / 1000);
+                         (CLOCKS_PER_SEC / 1000);
         if(mseconds > 100) {
             signal->frequency_changed = true;
             emit radio_frequency(rf_frequency);
@@ -263,77 +278,13 @@ void rx_hackrf_one::set_rf_frequency()
     }
 }
 //-------------------------------------------------------------------------------------------
-void rx_hackrf_one::set_gain_2(bool force)
-{
-    if(!signal->gain_changed){
-        end_wait_gain_changed = clock();
-        float mseconds = (end_wait_gain_changed - start_wait_gain_changed) /
-                (CLOCKS_PER_SEC / 1000);
-        if(mseconds > 10){
-            signal->gain_changed = true;
-            emit level_gain(gain_db);
-        }
-    }
-    if((agc && signal->change_gain) || force){
-        signal->change_gain = false;
-        gain_changed = false;
-        signal->gain_changed = false;
-        gain_db += signal->gain_offset;
-        int gain = gain_db;
-        uint32_t clip_gain = 0;
-        if(gain >= 40){
-            clip_gain = 40;
-            gain -=40;
-        }
-        else{
-            clip_gain = gain;
-            gain %= 8;
-            clip_gain -= gain;
-        }
-        int err = hackrf_set_lna_gain(device, clip_gain);
-//        fprintf(stderr, "LNA=%d\n", clip_gain);
-        clip_gain = 0;
-        if(gain){
-            if(gain >= 10){
-                clip_gain = 10;
-                gain -= 10;
-            }
-            else{
-                clip_gain = 0;
-            }
-        }
-        err |= hackrf_set_amp_enable(device, clip_gain ? 1 : 0);
-//        fprintf(stderr, "AMP=%d\n", clip_gain);
-        clip_gain = 0;
-        if(gain){
-            if(gain >= 50){
-                clip_gain = 50;
-            }
-            else{
-                clip_gain = gain;
-            }
-        }
-        err |= hackrf_set_vga_gain(device, uint32_t(clip_gain));
-//        fprintf(stderr, "VGA=%d\n", clip_gain);
-        if(err != 0){
-
-            emit status(err);
-
-        }
-        else{
-            signal->gain_changed = false;
-            start_wait_gain_changed = clock();
-        }
-    }
-}
-//-------------------------------------------------------------------------------------------
 void rx_hackrf_one::set_gain(bool force)
 {
     if(!signal->gain_changed){
         end_wait_gain_changed = clock();
         float mseconds = (end_wait_gain_changed - start_wait_gain_changed) /
-                (CLOCKS_PER_SEC / 1000);
-        if(mseconds > 10){
+                         (CLOCKS_PER_SEC / 1000);
+        if(mseconds > 20){
             signal->gain_changed = true;
             emit level_gain(gain_db);
         }
@@ -352,7 +303,7 @@ void rx_hackrf_one::set_gain(bool force)
             gain -= 12;
         }
         err |= hackrf_set_amp_enable(device, amp_enable);
-        fprintf(stderr, "AMP=%d\n", amp_enable);
+//        fprintf(stderr, "AMP=%d\n", amp_enable);
         if(gain >= 40){
             clip_gain = 40;
         }
@@ -361,8 +312,7 @@ void rx_hackrf_one::set_gain(bool force)
         }
         err |= hackrf_set_lna_gain(device, clip_gain);
         gain -= clip_gain;
-        fprintf(stderr, "LNA=%d\n", clip_gain);
-        clip_gain = 0;
+//        fprintf(stderr, "LNA=%d\n", clip_gain);
         if(gain >= 62){
             clip_gain = 62;
         }
@@ -370,7 +320,7 @@ void rx_hackrf_one::set_gain(bool force)
             clip_gain = gain - gain % 2;
         }
         err |= hackrf_set_vga_gain(device, uint32_t(clip_gain));
-        fprintf(stderr, "VGA=%d\n", clip_gain);
+//        fprintf(stderr, "VGA=%d\n", clip_gain);
         if(err != 0){
 
             emit status(err);
@@ -383,11 +333,15 @@ void rx_hackrf_one::set_gain(bool force)
     }
 }
 //-------------------------------------------------------------------------------------------
-void rx_hackrf_one::update()
+void rx_hackrf_one::update(int _gain_offset)
 {
     // coarse frequency setting
     set_rf_frequency();
     // AGC
+    if(_gain_offset != 0 && signal->gain_changed){
+        signal->gain_offset = _gain_offset;
+        signal->change_gain = true;
+    }
     set_gain();
 }
 //-------------------------------------------------------------------------------------------
@@ -398,23 +352,18 @@ int rx_hackrf_one::callback(hackrf_transfer* transfer)
     uint8_t *ptr = transfer->buffer;
     rx_hackrf_one *ctx = static_cast<rx_hackrf_one*>(transfer->rx_ctx);
 
-    ctx->rx_execute(ptr,transfer->valid_length);
-
-    if(!ctx->done){
-
-        return -1;
-    }
+    ctx->rx_execute(ptr, transfer->valid_length);
 
     return 0;
 }
 //-------------------------------------------------------------------------------------------
 void rx_hackrf_one::rx_execute(void *in_ptr, int nsamples)
 {
-    int8_t * ptr = (int8_t*)in_ptr;
-    for(int i = 0; i < nsamples; ++i)
-        ptr_buffer[i] = ptr[i];
-    len_buffer += nsamples / 2;
-    ptr_buffer += nsamples;
+    int8_t * ptr_device_buffer = (int8_t*)in_ptr;
+    int num_samples = nsamples / 2;
+    int gain_offset;
+    correct.execute(num_samples, ptr_device_buffer, ptr_out, gain_offset);
+    len_buffer += num_samples;
 
     if(demodulator->mutex->try_lock()) {
 
@@ -428,16 +377,20 @@ void rx_hackrf_one::rx_execute(void *in_ptr, int nsamples)
         }
 
         if(future.isFinished()){
-            future = QtConcurrent::run(this, &rx_hackrf_one::update);
+            future = QtConcurrent::run(this, &rx_hackrf_one::update, gain_offset);
         }
 
-        if(swap_buffer) {
-            emit execute(len_buffer, &buffer_a[0], &buffer_a[1], signal);
-            ptr_buffer = buffer_b;
+        if(swap_buffer){
+
+            emit execute(len_buffer, out_a, signal);
+
+            ptr_out = out_b;
         }
-        else {
-            emit execute(len_buffer, &buffer_b[0], &buffer_b[1], signal);
-            ptr_buffer = buffer_a;
+        else{
+
+            emit execute(len_buffer, out_b, signal);
+
+            ptr_out = out_a;
         }
         swap_buffer = !swap_buffer;
         len_buffer = 0;
@@ -452,22 +405,16 @@ void rx_hackrf_one::rx_execute(void *in_ptr, int nsamples)
             blocks = 1;
             len_buffer = 0;
             if(swap_buffer) {
-                ptr_buffer = buffer_a;
+                ptr_out = out_a;
             }
             else {
-                ptr_buffer = buffer_b;
+                ptr_out = out_b;
             }
+        }
+        else{
+            ptr_out += num_samples;
         }
     }
 }
 //-------------------------------------------------------------------------------------------
-void rx_hackrf_one::stop()
-{
-    done = false;
-    hackrf_stop_rx(device);
-    hackrf_close(device);
-    emit stop_demodulator();
-    if(thread->isRunning()) thread->wait(1000);
-    emit finished();
-}
-//-------------------------------------------------------------------------------------------
+

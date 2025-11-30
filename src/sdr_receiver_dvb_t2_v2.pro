@@ -38,15 +38,17 @@ QMAKE_CXXFLAGS += -ffast-math
 QMAKE_CXXFLAGS += -mavx2
 }
 else:win32:!win32-g++:{
+QMAKE_CXXFLAGS += /std:c++17
 QMAKE_CXXFLAGS += /O2
-QMAKE_CXXFLAGS += /fp:fast
+QMAKE_CXXFLAGS += /fp:precise
+# QMAKE_CXXFLAGS += /fp:fast
 QMAKE_CXXFLAGS += /Oi
 QMAKE_CXXFLAGS += /Ot
 QMAKE_CXXFLAGS += /Oy
 QMAKE_CXXFLAGS += /arch:AVX2
 }
 
-QMAKE_CXXFLAGS += -Wno-deprecated
+# QMAKE_CXXFLAGS += -Wno-deprecated
 
 #release: DESTDIR = ./Release
 #debug:   DESTDIR = ./Debug
@@ -55,6 +57,8 @@ DESTDIR = ./
 MOC_DIR = $$DESTDIR/moc
 OBJECTS_DIR = $$DESTDIR/obj
 DESTDIR = $$DESTDIR/bin
+
+# INCLUDEPATH += $$PWD/libuhd
 
 SOURCES += \
     DVB_T2/LDPC/tables_handler.cc \
@@ -74,6 +78,7 @@ SOURCES += \
     libairspy/src/airspy.c \
     libairspy/src/iqconverter_float.c \
     libairspy/src/iqconverter_int16.c \
+    libhackrf/hackrf.c \
     libplutosdr/upload_sdrusbgadget.cpp \
     libplutosdr/usb_plutosdr.cpp \
     list_device/scan_usb_device.cpp \
@@ -83,7 +88,7 @@ SOURCES += \
     qcustomplot.cpp \
     rx_airspy.cpp \
     rx_hackrf_one.cpp \
-    rx_plutosdr_daemon.cpp \
+    rx_pluto.cpp \
     rx_sdrplay.cpp \
     rx_usrp.cpp
 
@@ -93,6 +98,7 @@ HEADERS += \
     DSP/fast_math.h \
     DSP/filter_decimator.h \
     DSP/interpolator_farrow.hh \
+    DSP/iq_correct.hh \
     DSP/loop_filters.hh \
     DVB_T2/LDPC/algorithms.hh \
     # DVB_T2/LDPC/avx2.hh \
@@ -123,11 +129,13 @@ HEADERS += \
     libairspy/src/filters.h \
     libairspy/src/iqconverter_float.h \
     libairspy/src/iqconverter_int16.h \
+    libhackrf/hackrf.h \
     libplutosdr/upload_sdrusbgadget.h \
     libplutosdr/usb_plutosdr.h \
+    libuhd/uhd.h \
     list_device/scan_usb_device.h \
     rx_hackrf_one.h \
-    rx_plutosdr_daemon.h \
+    rx_pluto.h \
     rx_sdrplay.h\
     main_window.h \
     plot.h \
@@ -173,17 +181,24 @@ LIBS += -L$$PWD/libplutosdr/lib_iio/Windows-VS-2019-x64/ -llibiio
 INCLUDEPATH += $$PWD/libplutosdr/lib_iio/include
 DEPENDPATH += $$PWD/libplutosdr/lib_iio/include
 
-# LIBS += -L$$PWD/libpthreads/ -lpthreadVC3
-# INCLUDEPATH += $$PWD/libpthreads
-# DEPENDPATH += $$PWD/libpthreads
-# PRE_TARGETDEPS += $$PWD/libpthreads/pthreadVC3.lib
+LIBS += -L$$PWD/libpthreads/ -lpthreadVC3
+INCLUDEPATH += $$PWD/libpthreads
+DEPENDPATH += $$PWD/libpthreads
+PRE_TARGETDEPS += $$PWD/libpthreads/pthreadVC3.lib
 
 LIBS += -L$$PWD/libplutosdr/libssh/ -lssh
 INCLUDEPATH += $$PWD/libplutosdr/libssh/include
 DEPENDPATH += $$PWD/libplutosdr/libssh/include
 
+LIBS += -L$$PWD/libuhd/ -luhd
+INCLUDEPATH += $$PWD/libuhd/
+INCLUDEPATH += $$PWD/libuhd/uhd
+DEPENDPATH += $$PWD/libuhd/
+
 }
 
 RESOURCES += \
     libplutosdr/pluto_daemon.qrc
+
+
 
