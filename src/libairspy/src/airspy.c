@@ -820,7 +820,7 @@ static int airspy_open_init(airspy_device_t** device, uint64_t serial_number)
 	lib_device->transfers = NULL;
 	lib_device->callback = NULL;
 	lib_device->transfer_count = 16;
-	lib_device->buffer_size = 262144;
+    lib_device->buffer_size = TRANSFER_BUFFER_SIZE_BYTES;
 	lib_device->packing_enabled = false;
 	lib_device->streaming = false;
 	lib_device->stop_requested = false;
