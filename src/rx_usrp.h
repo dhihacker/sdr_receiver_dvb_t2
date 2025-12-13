@@ -88,8 +88,10 @@ private:
     clock_t start_wait_gain_changed;
     clock_t end_wait_gain_changed;
 
+    QFuture<void> future;
     void work(uint32_t len_out_device);
     void reset();
+    void update(int _gain_offset);
     void set_rf_frequency();
     void set_gain();
     const int bits = 15;

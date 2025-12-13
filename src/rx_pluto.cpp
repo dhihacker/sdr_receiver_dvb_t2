@@ -306,7 +306,7 @@ void rx_pluto::work()
 
                     demodulator->mutex->unlock();
 
-                    return;
+                    continue;
 
                 }
                 // coarse frequency setting

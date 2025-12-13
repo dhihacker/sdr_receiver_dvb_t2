@@ -183,6 +183,9 @@ void rx_usrp::reset()
     len_buffer = 0;
     blocks = 1;
 
+    // future.waitForFinished();
+    // future = QtConcurrent::run(this, &rx_usrp::update, gain_db);
+
     emit level_gain(gain_db);
     emit radio_frequency(rf_frequency);
 
@@ -221,7 +224,6 @@ void rx_usrp::set_rf_frequency()
             start_wait_frequency_changed = clock();
         }
     }
-
 }
 //-------------------------------------------------------------------------------------------
 void rx_usrp::set_gain()
@@ -256,6 +258,19 @@ void rx_usrp::set_gain()
             start_wait_gain_changed = clock();
         }
     }
+}
+//-------------------------------------------------------------------------------------------
+void rx_usrp::update(int _gain_offset)
+{
+    // coarse frequency setting
+    set_rf_frequency();
+    // AGC
+    if(_gain_offset != 0 && signal->gain_changed){
+        signal->gain_offset = _gain_offset;
+        signal->change_gain = true;
+    }
+    // AGC
+    set_gain();
 }
 //-------------------------------------------------------------------------------------------
 void rx_usrp::work(uint32_t len_out_device)
@@ -311,6 +326,7 @@ void rx_usrp::work(uint32_t len_out_device)
     while(done){
 
         void *buffer = device_buffer;
+
         uhd_rx_streamer_recv(rx_streamer, &buffer, len_request, &metadata, 0.1, false, &num_rx_samps);
 
         int gain_offset = 0;
@@ -330,11 +346,14 @@ void rx_usrp::work(uint32_t len_out_device)
 
                 demodulator->mutex->unlock();
 
-                return;
+                continue;
 
             }
             // coarse frequency setting
             set_rf_frequency();
+            // if(future.isFinished()){
+            //     future = QtConcurrent::run(this, &rx_usrp::update, gain_offset);
+            // }
 
             if(swap_buffer){
 
