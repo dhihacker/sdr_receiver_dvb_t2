@@ -19,8 +19,6 @@
 
 #include <string>
 
-#include "iio.h"
-
 #include "libplutosdr/usb_plutosdr.h"
 #include "DSP/iq_correct.hh"
 #include "DVB_T2/dvbt2_demodulator.h"

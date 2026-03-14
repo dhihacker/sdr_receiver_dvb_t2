@@ -163,8 +163,8 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 win32:{
 
 LIBS += -L$$PWD/libusb/lazy/ -llibusb-1.0
-INCLUDEPATH += $$PWD/libusb/include
-DEPENDPATH += $$PWD/libusb/include
+INCLUDEPATH += $$PWD/libusb/lazy
+DEPENDPATH += $$PWD/libusb/lazy
 PRE_TARGETDEPS += $$PWD/libusb/lazy/libusb-1.0.lib
 
 LIBS += -L$$PWD/fftw3/ -llibfftw3f-3
@@ -173,22 +173,26 @@ DEPENDPATH += $$PWD/fftw3
 PRE_TARGETDEPS += $$PWD/fftw3/libfftw3f-3.lib
 
 LIBS += -L$$PWD/sdrplay/ -lmir_sdr_api
-INCLUDEPATH += $$PWD/sdrplay
-DEPENDPATH += $$PWD/sdrplay
+INCLUDEPATH += $$PWD/sdrplay/include
+DEPENDPATH += $$PWD/sdrplay/include
 PRE_TARGETDEPS += $$PWD/sdrplay/mir_sdr_api.lib
 
-LIBS += -L$$PWD/libplutosdr/lib_iio/Windows-VS-2019-x64/ -llibiio
+INCLUDEPATH += $$PWD/libplutosdr/include
+DEPENDPATH += $$PWD/libplutosdr/include
+LIBS += -L$$PWD/libplutosdr/lib_iio/ -llibiio
 INCLUDEPATH += $$PWD/libplutosdr/lib_iio/include
 DEPENDPATH += $$PWD/libplutosdr/lib_iio/include
+PRE_TARGETDEPS += $$PWD/libplutosdr/lib_iio/libiio.lib
+
+LIBS += -L$$PWD/libplutosdr/libssh/ -lssh
+INCLUDEPATH += $$PWD/libplutosdr/libssh/include
+DEPENDPATH += $$PWD/libplutosdr/libssh/include
+PRE_TARGETDEPS += $$PWD/libplutosdr/libssh/ssh.lib
 
 LIBS += -L$$PWD/libpthreads/ -lpthreadVC3
 INCLUDEPATH += $$PWD/libpthreads
 DEPENDPATH += $$PWD/libpthreads
 PRE_TARGETDEPS += $$PWD/libpthreads/pthreadVC3.lib
-
-LIBS += -L$$PWD/libplutosdr/libssh/ -lssh
-INCLUDEPATH += $$PWD/libplutosdr/libssh/include
-DEPENDPATH += $$PWD/libplutosdr/libssh/include
 
 LIBS += -L$$PWD/libuhd/ -luhd
 INCLUDEPATH += $$PWD/libuhd/

@@ -48,12 +48,32 @@ int rx_pluto::get(string _ip,string &_ser_no, string &_hw_ver)
     sdrusbgadget->upload(_ip);
     delete sdrusbgadget;
 
+    // Create scan context
+    iio_scan_context* sctx = iio_create_scan_context(NULL, 0);
+    iio_context_info** ctxInfoList;
+    ssize_t count = iio_scan_context_get_info_list(sctx, &ctxInfoList);
+    std::string desc;
+    std::string duri;
+    for (ssize_t i = 0; i < count; i++) {
+        iio_context_info* info = ctxInfoList[i];
+        desc = iio_context_info_get_description(info);
+        duri = iio_context_info_get_uri(info);
+
+        qDebug() << "iio_context_info" << "desc" << desc.c_str() << " duri" << duri.c_str();
+
+        if (desc.find("PlutoSDR") != std::string::npos && duri.find("usb:") != std::string::npos) {
+
+            break;
+
+        }
+    }
+
     int probe = 5;
     while(probe > 0 && context == nullptr){
         --probe;
         QThread::sleep(1);
         //        context = iio_create_context_from_uri("ip:192.168.2.1");
-        context = iio_create_context_from_uri("usb:");
+        context = iio_create_context_from_uri(duri.c_str());
     }
 
     if(context == nullptr) return -1;
