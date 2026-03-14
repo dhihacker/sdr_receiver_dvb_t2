@@ -6,7 +6,7 @@
 
 #ifdef WIN32
 #include <Winsock2.h>
-#include "libssh.h"
+#include "libplutosdr/libssh/libssh.h"
 #else
 #include <libssh/libssh.h>
 #endif

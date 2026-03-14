@@ -1,3 +1,6 @@
+/*
+ * https://github.com/pgreenland/pluto-sdr-usb-gadget
+ */
 #include "usb_plutosdr.h"
 
 #include <QDebug>
@@ -165,12 +168,9 @@ void usb_plutosdr::thread_func(uint32_t curr_enabled_channels, uint32_t curr_buf
                                usb_plutosdr_transfer *transfer, usb_plutosdr_cb_fn callback)
 {
     cmd_usb_start_request_t cmd;
-    size_t curr_buffer_size_bytes;
-
-    // start stream
     cmd.enabled_channels = curr_enabled_channels;
     cmd.buffer_size = curr_buffer_size_samples;
-
+    // start stream
     int rc = libusb_control_transfer(usb_sdr_dev,
                                      LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_INTERFACE,
                                      SDR_USB_GADGET_COMMAND_START,
@@ -180,46 +180,29 @@ void usb_plutosdr::thread_func(uint32_t curr_enabled_channels, uint32_t curr_buf
                                      sizeof(cmd),
                                      1000);
     if(rc < 0) {
-        fprintf(stderr, "Failed to start RX stream (%d)", rc);
+        fprintf(stderr, "Failed to start RX stream (%d)\n", rc);
         return;
     }
-
     // calculate buffer size in bytes
-    uint32_t sample_size_bytes = /*curr_enabled_channels * */sizeof(uint16_t);
-    curr_buffer_size_bytes = curr_buffer_size_samples * sample_size_bytes * 2;
+    int curr_buffer_size_bytes = curr_buffer_size_samples * sizeof(uint16_t) * 2;
+    uint8_t *buffer = new uint8_t[curr_buffer_size_bytes];
 
-    // allocate buffer
-    std::shared_ptr<std::vector<uint8_t>> buffer = std::make_shared<std::vector<uint8_t>>();
-    buffer->resize(curr_buffer_size_bytes);
-
-    // keep running until told to stop
-    size_t buffers_to_drop = 32; // ensure anything kicking around in the queues and buffers is dropped
     while(!thread_stop.load()) {
-        // read data with 1s timeout
         int bytes_transferred = 0;
-        int rc = libusb_bulk_transfer(usb_sdr_dev, usb_sdr_ep_in, buffer->data(), buffer->size(),
-                                      &bytes_transferred, 3000);
+        int rc = libusb_bulk_transfer(usb_sdr_dev, usb_sdr_ep_in, buffer, curr_buffer_size_bytes,
+                                      &bytes_transferred, 0);
 
-        if(LIBUSB_SUCCESS == rc && ((size_t)bytes_transferred == buffer->size())) {
-            // transfer complete with expected size
-            if(0 == buffers_to_drop) {
-                // push buffer into fifo without blocking
-                transfer->samples = buffer->data();
-                transfer->num_samples = buffer->size();
-                callback(transfer);
+        if(LIBUSB_SUCCESS == rc ) {
+            transfer->samples = buffer;
+            transfer->num_bytes = bytes_transferred;
+            callback(transfer);
+            if(bytes_transferred != curr_buffer_size_bytes) {
+                fprintf(stderr, "Failed libusb_bulk_transfer bytes_transferred(%d)\n", bytes_transferred);
             }
-            else {
-                // still within initial drop range, discard buffer
-                buffers_to_drop--;
-            }
-
-
-            // create new buffer
-            buffer = std::make_shared<std::vector<uint8_t>>();
-            buffer->resize(curr_buffer_size_bytes);
         }
     }
 
+    delete[] buffer;
     // stop stream
     rc = libusb_control_transfer(usb_sdr_dev,
                                  LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_INTERFACE,

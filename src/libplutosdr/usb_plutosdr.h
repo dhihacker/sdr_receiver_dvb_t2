@@ -1,3 +1,6 @@
+/*
+ * https://github.com/pgreenland/pluto-sdr-usb-gadget
+ */
 #ifndef USB_PLUTOSDR_H
 #define USB_PLUTOSDR_H
 
@@ -5,19 +8,24 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-#include "libusb/include/libusb.h"
+#include "libusb/lazy/libusb.h"
 #else
 #include <libusb-1.0/libusb.h>
 #endif
 
-#include "iio.h"
+#include "libplutosdr/lib_iio/iio.h"
 
 typedef struct {
     void* ctx;
     void* samples;
-    int num_samples;
+    int num_bytes;
+    bool ready;
+    std::mutex mutex;
+    std::condition_variable conditional;
 } usb_plutosdr_transfer;
 
 typedef int (*usb_plutosdr_cb_fn)(usb_plutosdr_transfer* transfer);
