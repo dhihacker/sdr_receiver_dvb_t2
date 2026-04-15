@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
 
-  # 🔥 This adds the "Run workflow" button in GitHub Actions UI
+  # 🔥 Adds "Run workflow" button in GitHub UI
   workflow_dispatch:
 
 jobs:
@@ -13,13 +13,13 @@ jobs:
 
     steps:
       # -----------------------------------
-      # 1. Checkout source code
+      # 1. Checkout code
       # -----------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # -----------------------------------
-      # 2. Setup MSVC (Visual Studio tools)
+      # 2. Setup MSVC toolchain
       # -----------------------------------
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -36,39 +36,46 @@ jobs:
           arch: "win64_msvc2019_64"
 
       # -----------------------------------
-      # 4. Install FFTW (dependency)
+      # 4. Install vcpkg + FFTW (FIXED)
       # -----------------------------------
-      - name: Install FFTW
+      - name: Install FFTW via vcpkg
+        shell: cmd
         run: |
-          choco install fftw -y
+          git clone https://github.com/microsoft/vcpkg
+          cd vcpkg
+          bootstrap-vcpkg.bat
+          vcpkg install fftw3:x64-windows
 
       # -----------------------------------
-      # 5. Create build folder + run qmake
+      # 5. Configure project (qmake)
       # -----------------------------------
       - name: Configure project
+        shell: cmd
         run: |
           mkdir build
           cd build
-          qmake ../src/sdr_receiver_dvb_t2_v2.pro CONFIG+=release
+          qmake ..\src\sdr_receiver_dvb_t2_v2.pro CONFIG+=release
 
       # -----------------------------------
       # 6. Build project
       # -----------------------------------
       - name: Build project
+        shell: cmd
         run: |
           cd build
           nmake
 
       # -----------------------------------
-      # 7. Collect output EXE
+      # 7. Collect EXE output
       # -----------------------------------
       - name: Prepare output
+        shell: cmd
         run: |
           mkdir output
           copy build\bin\sdr_receiver_dvb_t2_v2.exe output\
 
       # -----------------------------------
-      # 8. Upload artifact (downloadable EXE)
+      # 8. Upload artifact
       # -----------------------------------
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
