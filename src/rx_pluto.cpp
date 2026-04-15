@@ -2,6 +2,48 @@
 
 #include "libplutosdr/upload_sdrusbgadget.h"
 
+#include <sstream>
+
+namespace {
+std::string pluto_iio_error_text(int err)
+{
+    switch (err) {
+    case -95:
+        return "Operation not supported (-95)";
+    case -22:
+        return "Invalid argument (-22)";
+    case -19:
+        return "No such device (-19)";
+    case -16:
+        return "Device or resource busy (-16)";
+    case -13:
+        return "Permission denied (-13)";
+    case -5:
+        return "Input/output error (-5)";
+    case -2:
+        return "No such file or directory (-2)";
+    case -1:
+        return "Operation not permitted (-1)";
+    default:
+        return {};
+    }
+}
+
+int log_iio_attr_error(const char *device_name, const char *channel_name,
+                       const char *attr_name, int err)
+{
+    if (err < 0) {
+        qWarning() << "PlutoSDR IIO write failed"
+                   << "device=" << device_name
+                   << "channel=" << channel_name
+                   << "attr=" << attr_name
+                   << "err=" << err;
+    }
+
+    return err;
+}
+}
+
 //-----------------------------------------------------------------------------------------------
 rx_pluto::rx_pluto(QObject *parent) : QObject(parent)
 {
@@ -37,9 +79,25 @@ rx_pluto::~rx_pluto()
 //-----------------------------------------------------------------------------------------------
 string	rx_pluto::error (int _err)
 {
+    if (_err >= 0) {
+        return "No error (0)";
+    }
+
     char err_str[256];
     iio_strerror(_err, err_str, sizeof(err_str));
-    return static_cast<string>(err_str);
+    std::string err = static_cast<string>(err_str);
+    if (err == "Unknown error") {
+        std::string fallback = pluto_iio_error_text(_err);
+        if (!fallback.empty()) {
+            return fallback;
+        }
+
+        std::ostringstream stream;
+        stream << "Unknown error (" << _err << ")";
+        return stream.str();
+    }
+
+    return err;
 }
 //-----------------------------------------------------------------------------------------------
 int rx_pluto::get(string _ip,string &_ser_no, string &_hw_ver)
@@ -107,7 +165,10 @@ int rx_pluto::init(uint32_t _rf_frequence_hz, int _gain)
 {
     int err;
 
-    err = iio_channel_attr_write_longlong(iio_device_find_channel(ad9361_phy, "altvoltage1", true), "powerdown", 1);
+    err = log_iio_attr_error("ad9361-phy", "altvoltage1", "powerdown",
+                             iio_channel_attr_write_longlong(
+                                 iio_device_find_channel(ad9361_phy, "altvoltage1", true),
+                                 "powerdown", 1));
 
     if(err !=0) return err;
 
@@ -115,19 +176,23 @@ int rx_pluto::init(uint32_t _rf_frequence_hz, int _gain)
     rf_frequency = ch_frequency;
 
     rx_lo = iio_device_find_channel(ad9361_phy, "altvoltage0", true);
-    err = iio_channel_attr_write_longlong(rx_lo, "frequency", rf_frequency);
+    err = log_iio_attr_error("ad9361-phy", "altvoltage0", "frequency",
+                             iio_channel_attr_write_longlong(rx_lo, "frequency", rf_frequency));
 
     if(err !=0) return err;
 
     rx_channel = iio_device_find_channel(ad9361_phy, "voltage0", false);
 
-    err = iio_channel_attr_write_longlong(rx_channel, "sampling_frequency", sample_rate_hz);
+    err = log_iio_attr_error("ad9361-phy", "voltage0", "sampling_frequency",
+                             iio_channel_attr_write_longlong(rx_channel, "sampling_frequency",
+                                                             sample_rate_hz));
 
     if(err !=0) return err;
 
     iio_channel_attr_write(rx_channel, "rf_port_select", "A_BALANCED");
 
-    err = iio_channel_attr_write_longlong(rx_channel, "rf_bandwidth", 8000000);
+    err = log_iio_attr_error("ad9361-phy", "voltage0", "rf_bandwidth",
+                             iio_channel_attr_write_longlong(rx_channel, "rf_bandwidth", 8000000));
 
     if(err !=0) return err;
 
@@ -140,23 +205,31 @@ int rx_pluto::init(uint32_t _rf_frequence_hz, int _gain)
         agc = false;
     }
 
-    err = iio_channel_attr_write_double(rx_channel, "hardwaregain", gain_db);
+    err = log_iio_attr_error("ad9361-phy", "voltage0", "gain_control_mode",
+                             iio_channel_attr_write(rx_channel, "gain_control_mode", "manual"));
 
     if(err !=0) return err;
 
-    err = iio_channel_attr_write(rx_channel, "gain_control_mode", "manual");
-
-    //    if(err !=0) return err;
-
-    err = iio_channel_attr_write_bool(rx_channel, "bb_dc_offset_tracking_en", false);
+    err = log_iio_attr_error("ad9361-phy", "voltage0", "hardwaregain",
+                             iio_channel_attr_write_double(rx_channel, "hardwaregain", gain_db));
 
     if(err !=0) return err;
 
-    err = iio_channel_attr_write_bool(rx_channel, "quadrature_tracking_en", false);
+    err = log_iio_attr_error("ad9361-phy", "voltage0", "bb_dc_offset_tracking_en",
+                             iio_channel_attr_write_bool(rx_channel, "bb_dc_offset_tracking_en",
+                                                         false));
 
     if(err !=0) return err;
 
-    err = iio_channel_attr_write_bool(rx_channel, "rf_dc_offset_tracking_en", false);
+    err = log_iio_attr_error("ad9361-phy", "voltage0", "quadrature_tracking_en",
+                             iio_channel_attr_write_bool(rx_channel, "quadrature_tracking_en",
+                                                         false));
+
+    if(err !=0) return err;
+
+    err = log_iio_attr_error("ad9361-phy", "voltage0", "rf_dc_offset_tracking_en",
+                             iio_channel_attr_write_bool(rx_channel, "rf_dc_offset_tracking_en",
+                                                         false));
 
     if(err !=0) return err;
 
@@ -378,5 +451,4 @@ void rx_pluto::work()
     
 }
 //-----------------------------------------------------------------------------------------------
-
 
