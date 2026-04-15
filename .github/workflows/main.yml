@@ -3,30 +3,19 @@ name: Build SDR DVB-T2 (Windows)
 on:
   push:
     branches: [ "main" ]
-
-  # 🔥 Adds "Run workflow" button in GitHub UI
   workflow_dispatch:
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
 
     steps:
-      # -----------------------------------
-      # 1. Checkout code
-      # -----------------------------------
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # -----------------------------------
-      # 2. Setup MSVC toolchain
-      # -----------------------------------
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      # -----------------------------------
-      # 3. Install Qt 5.15
-      # -----------------------------------
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -35,50 +24,27 @@ jobs:
           target: "desktop"
           arch: "win64_msvc2019_64"
 
-      # -----------------------------------
-      # 4. Install vcpkg + FFTW (FIXED)
-      # -----------------------------------
-      - name: Install FFTW via vcpkg
-        shell: cmd
-        run: |
-          git clone https://github.com/microsoft/vcpkg
-          cd vcpkg
-          bootstrap-vcpkg.bat
-          vcpkg install fftw3:x64-windows
-
-      # -----------------------------------
-      # 5. Configure project (qmake)
-      # -----------------------------------
-      - name: Configure project
+      - name: Configure (DISABLE AVX2)
         shell: cmd
         run: |
           mkdir build
           cd build
-          qmake ..\src\sdr_receiver_dvb_t2_v2.pro CONFIG+=release
+          qmake ..\src\sdr_receiver_dvb_t2_v2.pro CONFIG+=release DEFINES+=CI_BUILD
 
-      # -----------------------------------
-      # 6. Build project
-      # -----------------------------------
-      - name: Build project
+      - name: Build
         shell: cmd
         run: |
           cd build
           nmake
 
-      # -----------------------------------
-      # 7. Collect EXE output
-      # -----------------------------------
-      - name: Prepare output
+      - name: Package
         shell: cmd
         run: |
           mkdir output
           copy build\bin\sdr_receiver_dvb_t2_v2.exe output\
 
-      # -----------------------------------
-      # 8. Upload artifact
-      # -----------------------------------
-      - name: Upload build artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: sdr_receiver_dvb_t2_win_x64
+          name: sdr_receiver_dvb_t2
           path: output/
