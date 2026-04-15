@@ -1,0 +1,52 @@
+name: Build SDR DVB-T2 (Windows)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install Qt 5.15
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '5.15.2'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2019_64'
+
+    - name: Install dependencies (FFTW)
+      run: |
+        choco install fftw -y
+
+    - name: Configure build
+      run: |
+        mkdir build
+        cd build
+        qmake ../src/sdr_receiver_dvb_t2_v2.pro CONFIG+=release
+
+    - name: Build
+      run: |
+        cd build
+        nmake
+
+    - name: Copy executable
+      run: |
+        mkdir output
+        copy build\bin\sdr_receiver_dvb_t2_v2.exe output\
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sdr_receiver_dvb_t2_win_x64
+        path: output/
