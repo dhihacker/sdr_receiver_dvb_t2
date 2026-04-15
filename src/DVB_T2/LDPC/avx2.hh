@@ -137,7 +137,7 @@ inline SIMD<uint32_t, 8>
 vreinterpret(SIMD<float, 8> a)
 {
   SIMD<uint32_t, 8> tmp;
-  tmp.m = (__m256i) a.m;
+  tmp.m = _mm256_castps_si256(a.m);
   return tmp;
 }
 
@@ -155,7 +155,7 @@ inline SIMD<uint64_t, 4>
 vreinterpret(SIMD<double, 4> a)
 {
   SIMD<uint64_t, 4> tmp;
-  tmp.m = (__m256i) a.m;
+  tmp.m = _mm256_castpd_si256(a.m);
   return tmp;
 }
 
@@ -778,7 +778,7 @@ inline SIMD<uint32_t, 8>
 vceqz(SIMD<float, 8> a)
 {
   SIMD<uint32_t, 8> tmp;
-  tmp.m = (__m256i) _mm256_cmp_ps(a.m, _mm256_setzero_ps(), _CMP_EQ_OQ);
+  tmp.m = _mm256_castps_si256(_mm256_cmp_ps(a.m, _mm256_setzero_ps(), _CMP_EQ_OQ));
   return tmp;
 }
 
@@ -787,7 +787,7 @@ inline SIMD<uint64_t, 4>
 vceqz(SIMD<double, 4> a)
 {
   SIMD<uint64_t, 4> tmp;
-  tmp.m = (__m256i) _mm256_cmp_pd(a.m, _mm256_setzero_pd(), _CMP_EQ_OQ);
+  tmp.m = _mm256_castpd_si256(_mm256_cmp_pd(a.m, _mm256_setzero_pd(), _CMP_EQ_OQ));
   return tmp;
 }
 
@@ -832,7 +832,7 @@ inline SIMD<uint32_t, 8>
 vceq(SIMD<float, 8> a, SIMD<float, 8> b)
 {
   SIMD<uint32_t, 8> tmp;
-  tmp.m = (__m256i) _mm256_cmp_ps(a.m, b.m, _CMP_EQ_OQ);
+  tmp.m = _mm256_castps_si256(_mm256_cmp_ps(a.m, b.m, _CMP_EQ_OQ));
   return tmp;
 }
 
@@ -841,7 +841,7 @@ inline SIMD<uint64_t, 4>
 vceq(SIMD<double, 4> a, SIMD<double, 4> b)
 {
   SIMD<uint64_t, 4> tmp;
-  tmp.m = (__m256i) _mm256_cmp_pd(a.m, b.m, _CMP_EQ_OQ);
+  tmp.m = _mm256_castpd_si256(_mm256_cmp_pd(a.m, b.m, _CMP_EQ_OQ));
   return tmp;
 }
 
@@ -886,7 +886,7 @@ inline SIMD<uint32_t, 8>
 vcgtz(SIMD<float, 8> a)
 {
   SIMD<uint32_t, 8> tmp;
-  tmp.m = (__m256i) _mm256_cmp_ps(a.m, _mm256_setzero_ps(), _CMP_GT_OQ);
+  tmp.m = _mm256_castps_si256(_mm256_cmp_ps(a.m, _mm256_setzero_ps(), _CMP_GT_OQ));
   return tmp;
 }
 
@@ -895,7 +895,7 @@ inline SIMD<uint64_t, 4>
 vcgtz(SIMD<double, 4> a)
 {
   SIMD<uint64_t, 4> tmp;
-  tmp.m = (__m256i) _mm256_cmp_pd(a.m, _mm256_setzero_pd(), _CMP_GT_OQ);
+  tmp.m = _mm256_castpd_si256(_mm256_cmp_pd(a.m, _mm256_setzero_pd(), _CMP_GT_OQ));
   return tmp;
 }
 
@@ -940,7 +940,7 @@ inline SIMD<uint32_t, 8>
 vcltz(SIMD<float, 8> a)
 {
   SIMD<uint32_t, 8> tmp;
-  tmp.m = (__m256i) _mm256_cmp_ps(a.m, _mm256_setzero_ps(), _CMP_LT_OQ);
+  tmp.m = _mm256_castps_si256(_mm256_cmp_ps(a.m, _mm256_setzero_ps(), _CMP_LT_OQ));
   return tmp;
 }
 
@@ -949,7 +949,7 @@ inline SIMD<uint64_t, 4>
 vcltz(SIMD<double, 4> a)
 {
   SIMD<uint64_t, 4> tmp;
-  tmp.m = (__m256i) _mm256_cmp_pd(a.m, _mm256_setzero_pd(), _CMP_LT_OQ);
+  tmp.m = _mm256_castpd_si256(_mm256_cmp_pd(a.m, _mm256_setzero_pd(), _CMP_LT_OQ));
   return tmp;
 }
 
