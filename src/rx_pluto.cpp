@@ -127,11 +127,18 @@ int rx_pluto::get(string _ip,string &_ser_no, string &_hw_ver)
     }
 
     int probe = 5;
+    // Try using discovered duri first; if empty or not a usb: URI, fallback to Pluto IP (useful on Windows)
+    std::string uri_to_try = duri;
+    if (uri_to_try.empty() || uri_to_try.find("usb:") == std::string::npos) {
+        // On Windows libiio scan may not enumerate usb: URIs correctly; try the Pluto default IP
+        uri_to_try = "ip:192.168.2.1";
+    }
+
     while(probe > 0 && context == nullptr){
         --probe;
         QThread::sleep(1);
-        //        context = iio_create_context_from_uri("ip:192.168.2.1");
-        context = iio_create_context_from_uri(duri.c_str());
+        // Try discovered URI (usb: or ip:) or fallback IP
+        context = iio_create_context_from_uri(uri_to_try.c_str());
     }
 
     if(context == nullptr) return -1;
@@ -324,7 +331,7 @@ void rx_pluto::set_rf_frequency()
             signal->frequency_changed = false;
             start_wait_frequency_changed = clock();
         }
-//        qDebug() << "rx_plutosdr_daemon::set_rf_frequency" << rf_frequency;
+ //        qDebug() << "rx_plutosdr_daemon::set_rf_frequency" << rf_frequency;
     }
 }
 //-------------------------------------------------------------------------------------------
@@ -357,7 +364,7 @@ void rx_pluto::set_gain()
             signal->gain_changed = false;
             start_wait_gain_changed = clock();
         }
-//        qDebug() << "rx_plutosdr_daemon::set_gain" << gain_db;
+ //        qDebug() << "rx_plutosdr_daemon::set_gain" << gain_db;
     }
 }
 //-----------------------------------------------------------------------------------------------
