@@ -1,4 +1,3 @@
-
 #  Copyright 2020 Oleg Malyutin.
 
 # This program is free software: you can redistribute it and/or modify
@@ -188,7 +187,7 @@ PRE_TARGETDEPS += $$PWD/libplutosdr/lib_iio/libiio.lib
 LIBS += -L$$PWD/libplutosdr/libssh/ -lssh
 INCLUDEPATH += $$PWD/libplutosdr/libssh/include
 DEPENDPATH += $$PWD/libplutosdr/libssh/include
-PRE_TARGETDEPS += $$PWD/libplutosdr/libplutosdr/libssh/ssh.lib
+PRE_TARGETDEPS += $$PWD/libplutosdr/libssh/ssh.lib
 
 LIBS += -L$$PWD/libpthreads/ -lpthreadVC3
 INCLUDEPATH += $$PWD/libpthreads
